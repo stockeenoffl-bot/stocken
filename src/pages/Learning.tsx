@@ -1,17 +1,16 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
-  Upload,
   FileText,
   Play,
   FolderPlus,
   Plus,
   XCircle
 } from 'lucide-react'
-import { learningService, Course, Lesson } from '@/services/learningService'
+import { learningService } from '@/services/learningService'
+import type { Course, Lesson } from '@/services/learningService'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
-import { Loader2 } from 'lucide-react'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -31,7 +30,6 @@ export default function Learning() {
 
   const [courses, setCourses] = useState<Course[]>([])
   const [lessons, setLessons] = useState<Lesson[]>([])
-  const [loading, setLoading] = useState(true)
 
   // New Course Form
   const [newCourseTitle, setNewCourseTitle] = useState('')
@@ -49,7 +47,6 @@ export default function Learning() {
 
   const loadLearningData = async () => {
     try {
-      setLoading(true)
       const c = await learningService.getCourses()
       setCourses(c)
       if (c.length > 0) {
@@ -59,8 +56,6 @@ export default function Learning() {
       }
     } catch (err) {
       console.error('Failed to load learning data', err)
-    } finally {
-      setLoading(false)
     }
   }
 

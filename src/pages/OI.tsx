@@ -6,7 +6,8 @@ import {
   Play
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
-import { marketDataService, OIData } from '@/services/marketDataService'
+import { marketDataService } from '@/services/marketDataService'
+import type { OIData } from '@/services/marketDataService'
 import { toast } from 'sonner'
 import {
   ResponsiveContainer,
