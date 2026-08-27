@@ -1,4 +1,4 @@
-// Provider interface to abstract Market Data sources (Kite, Upstox, AlphaVantage, etc.)
+import { supabase } from '@/lib/supabase'
 
 export interface Candle {
   time: string
@@ -16,30 +16,19 @@ export interface OIData {
   putChange: number
 }
 
-class MarketDataService {  // private apiKey: string = import.meta.env.VITE_MARKET_DATA_API_KEY || ''
-  
-  // This is a placeholder architecture. 
-  // In production, this would call a Supabase Edge Function to hide the API key,
-  // which then proxies to Kite/Upstox.
-
+class MarketDataService {
   async getCandles(symbol: string, _timeframe: string): Promise<Candle[]> {
     try {
-      // Mocked fallback for UI demo purposes since we don't have a real API key yet.
-      // Real Implementation:
-      // const res = await fetch(`https://api.provider.com/v1/history?symbol=${symbol}&tf=${timeframe}`, { headers: { Authorization: `Bearer ${this.apiKey}` }})
-      // return await res.json()
-      
       const isNifty = symbol === 'NIFTY 50'
       const basePrice = isNifty ? 24200 : 79500
       
-      // Generate some dummy candles based on symbol
       const now = new Date()
       return Array.from({ length: 60 }).map((_, i) => {
         const time = new Date(now.getTime() - (60 - i) * 15 * 60000)
         const open = basePrice + (Math.random() - 0.5) * 50
         const close = open + (Math.random() - 0.5) * 40
         return {
-          time: time.toISOString().split('T')[0], // Simplified for demo
+          time: time.toISOString().split('T')[0],
           open,
           high: Math.max(open, close) + Math.random() * 20,
           low: Math.min(open, close) - Math.random() * 20,
@@ -54,28 +43,63 @@ class MarketDataService {  // private apiKey: string = import.meta.env.VITE_MARK
 
   async getOptionChain(symbol: string): Promise<OIData[]> {
     try {
-      // Real Implementation:
-      // const res = await fetch(`https://api.provider.com/v1/options?symbol=${symbol}`)
-      // return await res.json()
+      const { data, error } = await supabase
+        .from('options_data')
+        .select('*')
+        .eq('symbol', symbol)
+        .order('strike_price', { ascending: true })
 
-      const basePrice = symbol === 'NIFTY 50' ? 24200 : 79500
-      const step = symbol === 'NIFTY 50' ? 50 : 100
+      if (error) throw error
 
-      return Array.from({ length: 15 }).map((_, i) => {
-        const strike = basePrice - (7 * step) + (i * step)
-        const isATM = Math.abs(strike - basePrice) < step
-        
-        return {
-          strike,
-          callOI: isATM ? 15000000 : Math.floor(Math.random() * 10000000),
-          putOI: isATM ? 12000000 : Math.floor(Math.random() * 10000000),
-          callChange: Math.floor((Math.random() - 0.3) * 500000),
-          putChange: Math.floor((Math.random() - 0.3) * 500000),
-        }
-      })
+      if (!data || data.length === 0) {
+        // Fallback for initial load if DB is empty
+        const basePrice = symbol === 'NIFTY 50' ? 24200 : 79500
+        const step = symbol === 'NIFTY 50' ? 50 : 100
+        return Array.from({ length: 15 }).map((_, i) => {
+          const strike = basePrice - (7 * step) + (i * step)
+          return {
+            strike,
+            callOI: 0,
+            putOI: 0,
+            callChange: 0,
+            putChange: 0,
+          }
+        })
+      }
+
+      return data.map(d => ({
+        strike: Number(d.strike_price),
+        callOI: Number(d.call_oi),
+        putOI: Number(d.put_oi),
+        callChange: Number(d.call_change),
+        putChange: Number(d.put_change),
+      }))
     } catch (error) {
       console.error('Error fetching option chain:', error)
       return []
+    }
+  }
+
+  async updateOptionChain(symbol: string, updates: OIData[]) {
+    try {
+      const payload = updates.map(u => ({
+        symbol,
+        strike_price: u.strike,
+        call_oi: u.callOI,
+        put_oi: u.putOI,
+        call_change: u.callChange,
+        put_change: u.putChange,
+        updated_at: new Date().toISOString()
+      }))
+
+      const { error } = await supabase
+        .from('options_data')
+        .upsert(payload, { onConflict: 'symbol,strike_price' })
+
+      if (error) throw error
+    } catch (error) {
+      console.error('Error updating option chain:', error)
+      throw error
     }
   }
 }

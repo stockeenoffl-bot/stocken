@@ -8,9 +8,10 @@ import {
   Plus,
   XCircle
 } from 'lucide-react'
-import { learningService } from '@/services/learningService'
-import type { LearningVideo } from '@/services/learningService'
+import { learningService, Course, Lesson } from '@/services/learningService'
+import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -25,43 +26,83 @@ const itemVariants = {
 export default function Learning() {
   const [activeSubTab, setActiveSubTab] = useState('upload-pdfs')
 
-  // Learning State (Upload PDFs & Video drafts)
-  const [pdfTitle, setPdfTitle] = useState('')
-  const [pdfCategory, setPdfCategory] = useState('Technical Analysis')
-  const [uploadedPdfs, setUploadedPdfs] = useState<any[]>([])
-  const [learningVideos, setLearningVideos] = useState<LearningVideo[]>([])
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+
+  const [courses, setCourses] = useState<Course[]>([])
+  const [lessons, setLessons] = useState<Lesson[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // New Course Form
+  const [newCourseTitle, setNewCourseTitle] = useState('')
+  const [newCourseDesc, setNewCourseDesc] = useState('')
+
+  // New Lesson Form
+  const [selectedCourse, setSelectedCourse] = useState<string>('')
+  const [newLessonTitle, setNewLessonTitle] = useState('')
+  const [newLessonVideo, setNewLessonVideo] = useState('')
+  const [newLessonContent, setNewLessonContent] = useState('')
 
   useEffect(() => {
-    async function loadLearningData() {
-      try {
-        const videos = await learningService.getVideos()
-        const docs = await learningService.getDocuments()
-        setLearningVideos(videos)
-        setUploadedPdfs(docs)
-      } catch (err) {
-        console.error('Failed to load learning data', err)
-      }
-    }
     loadLearningData()
   }, [])
 
-  const handleUploadPdf = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!pdfTitle) return
-    // In a real app this would upload to Supabase Storage
-    toast.success('PDF Upload simulated successfully')
-    setPdfTitle('')
+  const loadLearningData = async () => {
+    try {
+      setLoading(true)
+      const c = await learningService.getCourses()
+      setCourses(c)
+      if (c.length > 0) {
+        setSelectedCourse(c[0].id)
+        const l = await learningService.getLessons(c[0].id)
+        setLessons(l)
+      }
+    } catch (err) {
+      console.error('Failed to load learning data', err)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const toggleVideoStatus = async (id: string, currentStatus: string) => {
+  const handleCreateCourse = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newCourseTitle) return
     try {
-      await learningService.toggleVideoStatus(id, currentStatus)
-      setLearningVideos(prev =>
-        prev.map(v => v.id === id ? { ...v, status: currentStatus === 'Published' ? 'Draft' : 'Published' } : v)
+      await learningService.createCourse(newCourseTitle, newCourseDesc)
+      toast.success('Course created')
+      setNewCourseTitle('')
+      setNewCourseDesc('')
+      loadLearningData()
+    } catch (err: any) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const handleCreateLesson = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newLessonTitle || !selectedCourse) return
+    try {
+      await learningService.createLesson(selectedCourse, newLessonTitle, newLessonVideo, newLessonContent)
+      toast.success('Lesson added')
+      setNewLessonTitle('')
+      setNewLessonVideo('')
+      setNewLessonContent('')
+      const l = await learningService.getLessons(selectedCourse)
+      setLessons(l)
+    } catch (err: any) {
+      toast.error('Error: ' + err.message)
+    }
+  }
+
+  const toggleCourseStatus = async (id: string, currentPublished: boolean) => {
+    try {
+      await learningService.toggleCourseStatus(id, currentPublished)
+      setCourses(prev =>
+        prev.map(c => c.id === id ? { ...c, published: !currentPublished } : c)
       )
-      toast.success('Video status updated')
+      toast.success('Course status updated')
     } catch (err) {
-      toast.error('Failed to update video status')
+      toast.error('Failed to update course status')
     }
   }
 
@@ -118,60 +159,83 @@ export default function Learning() {
                 <p className="text-[10px] text-[var(--text-muted)] mt-0.5">Publish manual books and trading worksheets for VIP/Pro subscribers.</p>
               </div>
 
-              <form onSubmit={handleUploadPdf} className="space-y-3 p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
-                <div className="border border-dashed border-[var(--border-subtle)] rounded-lg p-6 text-center hover:border-[var(--accent-indigo)] transition-colors cursor-pointer">
-                  <Upload className="mx-auto text-[var(--text-muted)] mb-2" size={24} />
-                  <span className="text-xs text-[var(--text-secondary)] block">Drag & Drop files here or click to browse</span>
-                  <span className="text-[9px] text-[var(--text-muted)] block mt-1">PDF file formats up to 25MB</span>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {isAdmin && (
+                <form onSubmit={handleCreateLesson} className="space-y-3 p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Select Course</label>
+                      <select
+                        value={selectedCourse}
+                        onChange={async (e) => {
+                          setSelectedCourse(e.target.value)
+                          if (e.target.value) {
+                            const l = await learningService.getLessons(e.target.value)
+                            setLessons(l)
+                          }
+                        }}
+                        className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)] focus:border-[var(--accent-indigo)]"
+                      >
+                        {courses.map(c => (
+                          <option key={c.id} value={c.id}>{c.title}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Lesson Title</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Master Class Volume Mechanics"
+                        value={newLessonTitle}
+                        onChange={(e) => setNewLessonTitle(e.target.value)}
+                        className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Video URL (optional)</label>
+                      <input
+                        type="text"
+                        placeholder="e.g. https://youtube.com/watch?v=..."
+                        value={newLessonVideo}
+                        onChange={(e) => setNewLessonVideo(e.target.value)}
+                        className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                      />
+                    </div>
+                  </div>
                   <div>
-                    <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Document Title</label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Master Class Volume Mechanics"
-                      value={pdfTitle}
-                      onChange={(e) => setPdfTitle(e.target.value)}
+                    <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Content / Notes</label>
+                    <textarea
+                      placeholder="Add PDF links, lesson notes, etc."
+                      value={newLessonContent}
+                      onChange={(e) => setNewLessonContent(e.target.value)}
                       className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                      rows={3}
                     />
                   </div>
-                  <div>
-                    <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Folder Category</label>
-                    <select
-                      value={pdfCategory}
-                      onChange={(e) => setPdfCategory(e.target.value)}
-                      className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-secondary)] focus:border-[var(--accent-indigo)]"
-                    >
-                      <option value="Technical Analysis">Technical Analysis</option>
-                      <option value="Volume Profile">Volume Profile</option>
-                      <option value="Risk Management">Risk Management</option>
-                    </select>
-                  </div>
-                </div>
-                <button
-                  type="submit"
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-indigo)] text-white text-xs font-bold hover:brightness-110 transition-all"
-                >
-                  <Plus size={14} /> Add Document
-                </button>
-              </form>
+                  <button
+                    type="submit"
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-md bg-[var(--accent-indigo)] text-white text-xs font-bold hover:brightness-110 transition-all"
+                  >
+                    <Plus size={14} /> Add Lesson
+                  </button>
+                </form>
+              )}
 
-              {/* PDF list */}
-              <div className="space-y-2">
-                <span className="text-[9px] uppercase font-bold text-[var(--text-muted)] block">Uploaded Documents</span>
-                  {uploadedPdfs.length > 0 ? uploadedPdfs.map(pdf => (
-                    <div key={pdf.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs">
+              {/* Lessons list */}
+              <div className="space-y-2 mt-4">
+                <span className="text-[9px] uppercase font-bold text-[var(--text-muted)] block">Lessons in Selected Course</span>
+                  {lessons.length > 0 ? lessons.map(lesson => (
+                    <div key={lesson.id} className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs">
                       <div className="flex items-center gap-2">
                         <FileText size={16} className="text-[var(--accent-indigo)]" />
                         <div>
-                          <span className="font-semibold text-[var(--text-primary)] block">{pdf.title}</span>
-                          <span className="text-[9px] text-[var(--text-muted)] block mt-0.5">{pdf.category || 'General'} &middot; {pdf.size || '1.2 MB'}</span>
+                          <span className="font-semibold text-[var(--text-primary)] block">{lesson.title}</span>
+                          <span className="text-[9px] text-[var(--text-muted)] block mt-0.5 truncate max-w-sm">{lesson.content || 'No content provided'}</span>
                         </div>
                       </div>
-                      <span className="font-mono text-[9px] text-[var(--text-muted)]">{new Date(pdf.created_at).toLocaleDateString()}</span>
+                      <span className="font-mono text-[9px] text-[var(--text-muted)]">{new Date(lesson.created_at).toLocaleDateString()}</span>
                     </div>
                   )) : (
-                    <div className="p-4 text-center text-xs text-[var(--text-muted)]">No documents uploaded yet.</div>
+                    <div className="p-4 text-center text-xs text-[var(--text-muted)]">No lessons uploaded yet for this course.</div>
                   )}
               </div>
             </div>
@@ -185,27 +249,29 @@ export default function Learning() {
               </div>
 
               <div className="space-y-2">
-                {learningVideos.length > 0 ? learningVideos.map(video => (
-                  <div key={video.id} className="flex items-center justify-between p-3.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                {courses.length > 0 ? courses.map(course => (
+                  <div key={course.id} className="flex items-center justify-between p-3.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
                     <div className="flex items-center gap-3">
                       <Play size={16} className="text-emerald-400" />
                       <div>
-                        <span className="text-xs font-bold text-[var(--text-primary)] block">{video.title}</span>
-                        <span className="text-[9px] text-[var(--text-muted)] block mt-0.5">Length: {video.duration || '00:00'}</span>
+                        <span className="text-xs font-bold text-[var(--text-primary)] block">{course.title}</span>
+                        <span className="text-[9px] text-[var(--text-muted)] block mt-0.5">{course.description || 'No description'}</span>
                       </div>
                     </div>
-                    <button
-                      onClick={() => toggleVideoStatus(video.id, video.status)}
-                      className={`px-3 py-1 rounded text-[10px] font-bold border transition-colors ${
-                        video.status === 'Published' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-slate-500/10 border-slate-500/20 text-[var(--text-secondary)]'
-                      }`}
-                    >
-                      {video.status}
-                    </button>
+                    {isAdmin && (
+                      <button
+                        onClick={() => toggleCourseStatus(course.id, course.published)}
+                        className={`px-3 py-1 rounded text-[10px] font-bold border transition-colors ${
+                          course.published ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-slate-500/10 border-slate-500/20 text-[var(--text-secondary)]'
+                        }`}
+                      >
+                        {course.published ? 'Published' : 'Draft'}
+                      </button>
+                    )}
                   </div>
                 )) : (
                   <div className="p-4 text-center text-xs text-[var(--text-muted)] border rounded-lg border-dashed border-[var(--border-subtle)]">
-                    No videos available. Please configure the database table.
+                    No courses available.
                   </div>
                 )}
               </div>
@@ -220,26 +286,43 @@ export default function Learning() {
               </div>
 
               <div className="space-y-3">
-                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-[var(--text-primary)]">Volume Profile Masterclass</span>
-                    <span className="text-[10px] text-[var(--text-muted)]">3 Modules</span>
-                  </div>
-                  <div className="h-1 rounded-full bg-[var(--bg-secondary)] overflow-hidden"><div className="h-full bg-[var(--accent-indigo)]" style={{ width: '100%' }} /></div>
-                </div>
+                {isAdmin && (
+                  <form onSubmit={handleCreateCourse} className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-3 mb-6">
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Course Title</label>
+                      <input
+                        type="text"
+                        required
+                        value={newCourseTitle}
+                        onChange={(e) => setNewCourseTitle(e.target.value)}
+                        className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Description</label>
+                      <input
+                        type="text"
+                        value={newCourseDesc}
+                        onChange={(e) => setNewCourseDesc(e.target.value)}
+                        className="w-full mt-1.5 px-3 py-2 rounded-md border text-xs outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                      />
+                    </div>
+                    <button type="submit" className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--accent-indigo)] text-white text-xs font-bold hover:brightness-110 transition-colors">
+                      <FolderPlus size={13} />
+                      Create New Course
+                    </button>
+                  </form>
+                )}
 
-                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-2">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-[var(--text-primary)]">Index Trading Breakouts 101</span>
-                    <span className="text-[10px] text-[var(--text-muted)]">4 Modules</span>
+                {courses.map(course => (
+                  <div key={course.id} className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-2">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-bold text-[var(--text-primary)]">{course.title}</span>
+                      <span className="text-[10px] text-[var(--text-muted)]">{course.published ? 'Published' : 'Draft'}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-[var(--bg-secondary)] overflow-hidden"><div className="h-full bg-[var(--accent-indigo)]" style={{ width: '100%' }} /></div>
                   </div>
-                  <div className="h-1 rounded-full bg-[var(--bg-secondary)] overflow-hidden"><div className="h-full bg-[var(--accent-indigo)]" style={{ width: '75%' }} /></div>
-                </div>
-
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs text-[var(--text-secondary)] hover:text-white transition-colors">
-                  <FolderPlus size={13} />
-                  New Course Blueprint
-                </button>
+                ))}
               </div>
             </div>
           )}

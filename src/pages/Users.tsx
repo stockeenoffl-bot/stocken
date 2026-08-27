@@ -8,13 +8,18 @@ import {
   Globe
 } from 'lucide-react'
 
-interface MockUser {
+import { userService } from '@/services/userService'
+import { toast } from 'sonner'
+import { Loader2 } from 'lucide-react'
+
+interface RealUser {
   id: string
-  name: string
+  full_name: string
   email: string
-  plan: 'Free' | 'Pro' | 'VIP'
-  status: 'Active' | 'Inactive'
-  joinedDate: string
+  role: string
+  status: string
+  created_at: string
+  plan: string
 }
 
 const containerVariants = {
@@ -30,24 +35,57 @@ const itemVariants = {
 export default function Users() {
   const [activeSubTab, setActiveSubTab] = useState('search-users')
   const [userQuery, setUserQuery] = useState('')
-  const [mockUsers, setMockUsers] = useState<MockUser[]>([
-    { id: '1', name: 'Alexander Wright', email: 'alexander@tradehub.io', plan: 'VIP', status: 'Active', joinedDate: '12 Jan 2025' },
-    { id: '2', name: 'Sarah Jenkins', email: 'sarah.j@gmail.com', plan: 'Pro', status: 'Active', joinedDate: '24 Feb 2025' },
-    { id: '3', name: 'Marcus Chen', email: 'marcus.chen@capital.net', plan: 'Free', status: 'Inactive', joinedDate: '03 Mar 2025' },
-    { id: '4', name: 'David Kojo', email: 'david.kojo@outlook.com', plan: 'Pro', status: 'Active', joinedDate: '15 Mar 2025' },
-    { id: '5', name: 'Elena Rostova', email: 'elena.ros@yandex.ru', plan: 'VIP', status: 'Active', joinedDate: '18 Mar 2025' },
-  ])
+  const [users, setUsers] = useState<RealUser[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const toggleUserStatus = (id: string) => {
-    setMockUsers(prev =>
-      prev.map(u => u.id === id ? { ...u, status: u.status === 'Active' ? 'Inactive' : 'Active' } : u)
-    )
+  useEffect(() => {
+    loadUsers()
+  }, [])
+
+  const loadUsers = async () => {
+    try {
+      setLoading(true)
+      const data = await userService.getAllUsers()
+      const formatted = data.map((u: any) => {
+        const subs = u.subscriptions || []
+        const activeSub = subs.find((s: any) => s.status === 'active')
+        return {
+          id: u.id,
+          full_name: u.full_name || 'Unknown',
+          email: u.email,
+          role: u.role,
+          status: u.status,
+          created_at: new Date(u.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+          plan: activeSub?.subscription_plans?.name || 'Free'
+        }
+      })
+      setUsers(formatted)
+    } catch (error: any) {
+      toast.error('Failed to load users: ' + error.message)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const changeUserPlan = (id: string, newPlan: 'Free' | 'Pro' | 'VIP') => {
-    setMockUsers(prev =>
-      prev.map(u => u.id === id ? { ...u, plan: newPlan } : u)
-    )
+  const toggleUserStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
+    try {
+      await userService.updateUserStatus(id, newStatus)
+      toast.success(`User status updated to ${newStatus}`)
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status: newStatus } : u))
+    } catch (error: any) {
+      toast.error('Failed to update status: ' + error.message)
+    }
+  }
+
+  const changeUserPlan = async (id: string, newPlan: string) => {
+    try {
+      await userService.updateUserPlan(id, newPlan)
+      toast.success(`User upgraded to ${newPlan}`)
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, plan: newPlan } : u))
+    } catch (error: any) {
+      toast.error('Failed to update plan: ' + error.message)
+    }
   }
 
   const subTabs = [
@@ -58,8 +96,8 @@ export default function Users() {
     { id: 'device-info', label: 'Device information' }
   ]
 
-  const filteredUsers = mockUsers.filter(u =>
-    u.name.toLowerCase().includes(userQuery.toLowerCase()) ||
+  const filteredUsers = users.filter(u =>
+    u.full_name.toLowerCase().includes(userQuery.toLowerCase()) ||
     u.email.toLowerCase().includes(userQuery.toLowerCase())
   )
 
@@ -133,17 +171,23 @@ export default function Users() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredUsers.length > 0 ? (
+                    {loading ? (
+                      <tr>
+                        <td colSpan={4} className="p-8 text-center">
+                          <Loader2 className="animate-spin text-[var(--accent-indigo)] mx-auto" />
+                        </td>
+                      </tr>
+                    ) : filteredUsers.length > 0 ? (
                       filteredUsers.map(user => (
                         <tr key={user.id} className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                          <td className="p-3 font-semibold text-[var(--text-primary)]">{user.name}</td>
+                          <td className="p-3 font-semibold text-[var(--text-primary)]">{user.full_name}</td>
                           <td className="p-3 font-mono">{user.email}</td>
                           <td className="p-3">
                             <span className={`px-2 py-0.5 rounded text-[9px] font-bold bg-[var(--bg-secondary)] border border-[var(--border-subtle)]`}>
                               {user.plan}
                             </span>
                           </td>
-                          <td className="p-3 font-mono">{user.joinedDate}</td>
+                          <td className="p-3 font-mono">{user.created_at}</td>
                         </tr>
                       ))
                     ) : (
@@ -165,20 +209,20 @@ export default function Users() {
               </div>
 
               <div className="space-y-2">
-                {mockUsers.map(user => (
+                {users.map(user => (
                   <div key={user.id} className="flex items-center justify-between p-3.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
                     <div>
-                      <span className="text-xs font-bold text-[var(--text-primary)]">{user.name}</span>
+                      <span className="text-xs font-bold text-[var(--text-primary)]">{user.full_name}</span>
                       <span className="text-[9px] font-mono text-[var(--text-muted)] block mt-0.5">{user.email}</span>
                     </div>
                     <button
-                      onClick={() => toggleUserStatus(user.id)}
+                      onClick={() => toggleUserStatus(user.id, user.status)}
                       className="text-[var(--accent-indigo)] transition-transform active:scale-95 flex items-center gap-2 text-xs"
                     >
-                      <span className={`text-[10px] font-bold ${user.status === 'Active' ? 'text-emerald-400' : 'text-[var(--text-muted)]'}`}>
+                      <span className={`text-[10px] font-bold uppercase ${user.status === 'active' ? 'text-emerald-400' : 'text-[var(--danger)]'}`}>
                         {user.status}
                       </span>
-                      {user.status === 'Active' ? <ToggleRight size={24} className="text-emerald-500" /> : <ToggleLeft size={24} className="text-[var(--text-muted)]" />}
+                      {user.status === 'active' ? <ToggleRight size={24} className="text-emerald-500" /> : <ToggleLeft size={24} className="text-[var(--danger)]" />}
                     </button>
                   </div>
                 ))}
@@ -194,15 +238,15 @@ export default function Users() {
               </div>
 
               <div className="space-y-2">
-                {mockUsers.map(user => (
+                {users.map(user => (
                   <div key={user.id} className="flex items-center justify-between p-3.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
                     <div>
-                      <span className="text-xs font-bold text-[var(--text-primary)]">{user.name}</span>
+                      <span className="text-xs font-bold text-[var(--text-primary)]">{user.full_name}</span>
                       <span className="text-[9px] font-mono text-[var(--text-muted)] block mt-0.5">Current plan: {user.plan}</span>
                     </div>
                     <select
                       value={user.plan}
-                      onChange={(e) => changeUserPlan(user.id, e.target.value as any)}
+                      onChange={(e) => changeUserPlan(user.id, e.target.value)}
                       className="px-2 py-1 text-xs rounded-md border outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                     >
                       <option value="Free">Free</option>

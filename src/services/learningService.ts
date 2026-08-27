@@ -1,27 +1,29 @@
 import { supabase } from '@/lib/supabase'
 
-export interface LearningVideo {
+export interface Course {
   id: string
   title: string
-  duration: string
-  status: 'Published' | 'Draft'
-  category_id?: string
-  video_url?: string
+  description?: string
+  visibility: string
+  published: boolean
+  thumbnail_url?: string
+  created_at: string
 }
 
-export interface LearningDocument {
+export interface Lesson {
   id: string
+  course_id: string
   title: string
-  category: string
-  size: string
+  description?: string
+  content?: string
+  video_url?: string
   created_at: string
-  file_url?: string
 }
 
 export const learningService = {
-  async getVideos(): Promise<LearningVideo[]> {
+  async getCourses(): Promise<Course[]> {
     const { data, error } = await supabase
-      .from('learning_modules')
+      .from('courses')
       .select('*')
       .order('created_at', { ascending: false })
 
@@ -29,30 +31,39 @@ export const learningService = {
     return data || []
   },
 
-  async toggleVideoStatus(id: string, currentStatus: string): Promise<void> {
-    const newStatus = currentStatus === 'Published' ? 'Draft' : 'Published'
+  async toggleCourseStatus(id: string, currentPublished: boolean): Promise<void> {
     const { error } = await supabase
-      .from('learning_modules')
-      .update({ status: newStatus })
+      .from('courses')
+      .update({ published: !currentPublished })
       .eq('id', id)
       
     if (error) throw error
   },
 
-  async getDocuments(): Promise<LearningDocument[]> {
-    // For demo purposes this pulls from a mock table, but you could create 'learning_documents' 
-    // table in supabase. We'll use learning_modules for both for now to save schema space if needed,
-    // or just return mock if table doesn't exist.
-    const { data, error } = await supabase
-      .from('learning_modules')
-      .select('*')
-      .eq('content_type', 'pdf')
-      .order('created_at', { ascending: false })
+  async createCourse(title: string, description: string): Promise<void> {
+    const { error } = await supabase
+      .from('courses')
+      .insert([{ title, description, slug: title.toLowerCase().replace(/ /g, '-'), published: false }])
+    
+    if (error) throw error
+  },
 
-    if (error) {
-      console.warn("Table might not exist, returning empty", error)
-      return []
-    }
+  async getLessons(courseId: string): Promise<Lesson[]> {
+    const { data, error } = await supabase
+      .from('lessons')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('sort_order', { ascending: true })
+
+    if (error) throw error
     return data || []
+  },
+
+  async createLesson(courseId: string, title: string, videoUrl: string, content: string = ''): Promise<void> {
+    const { error } = await supabase
+      .from('lessons')
+      .insert([{ course_id: courseId, title, video_url: videoUrl, content }])
+      
+    if (error) throw error
   }
 }

@@ -5,7 +5,9 @@ import {
   Loader2,
   Play
 } from 'lucide-react'
-import { marketDataService } from '@/services/marketDataService'
+import { useAuth } from '@/contexts/AuthContext'
+import { marketDataService, OIData } from '@/services/marketDataService'
+import { toast } from 'sonner'
 import {
   ResponsiveContainer,
   BarChart,
@@ -66,6 +68,13 @@ export default function OI() {
   const [analysisMode, setAnalysisMode] = useState<'intraday' | 'historical'>('intraday')
   const [notesText, setNotesText] = useState('')
 
+  // Auth and Admin Edit Mode
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const [isEditMode, setIsEditMode] = useState(false)
+  const [rawOiData, setRawOiData] = useState<OIData[]>([])
+  const [saving, setSaving] = useState(false)
+
   // Mock Data for OI Change Table
   const oiChangeData: OiChangeRow[] = [
     { date: '17-02-2025', time: '11:13:00', dhb: null, changeCallOi: 10336050, changePutOi: 16314675, diffOi: 5978625, directionChange: -24.53, changeDirection: -1943700, totalCallLtpChg: 3217.6, cepeLtpChg: -1031.95, putLtpChg: -359.1, totalPutLtp: 2465.25, netPcr: 1.58, dhbDiffOi: null, sentiment: 'Bullish' },
@@ -86,6 +95,8 @@ export default function OI() {
       try {
         setLoading(true)
         const data = await marketDataService.getOptionChain(analysisIndex)
+        
+        setRawOiData(data)
         
         // Format for Recharts
         const chartData = data.map(d => ({
@@ -109,6 +120,36 @@ export default function OI() {
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('en-IN').format(num)
+  }
+
+  const handleSaveOiData = async () => {
+    try {
+      setSaving(true)
+      await marketDataService.updateOptionChain(analysisIndex, rawOiData)
+      toast.success('Option chain updated successfully')
+      
+      // Refresh chart
+      const chartData = rawOiData.map(d => ({
+        strike: d.strike.toLocaleString('en-IN'),
+        CallOI: d.callOI / 100000,
+        PutOI: d.putOI / 100000,
+      }))
+      setOiAnalysisChartData(chartData)
+      setIsEditMode(false)
+    } catch (err: any) {
+      toast.error('Failed to save data: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleOiChange = (index: number, field: keyof OIData, value: string) => {
+    const numValue = parseInt(value.replace(/,/g, ''), 10) || 0
+    setRawOiData(prev => {
+      const newData = [...prev]
+      newData[index] = { ...newData[index], [field]: numValue }
+      return newData
+    })
   }
 
   return (
@@ -436,8 +477,20 @@ export default function OI() {
                 </select>
               </div>
 
+              {isAdmin && (
+                <button
+                  onClick={() => setIsEditMode(!isEditMode)}
+                  className={`py-1 px-3 rounded-md text-xs font-semibold shadow-md transition-colors ${
+                    isEditMode 
+                      ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/20' 
+                      : 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-600/10'
+                  }`}
+                >
+                  {isEditMode ? 'Cancel Edit' : 'Edit Chain'}
+                </button>
+              )}
               <button
-                className="py-1 px-3 rounded-md text-xs font-semibold text-white bg-purple-600 hover:bg-purple-700 shadow-md shadow-purple-600/10"
+                className="py-1 px-3 rounded-md text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-md shadow-indigo-600/10"
               >
                 Option Chain
               </button>
@@ -516,12 +569,81 @@ export default function OI() {
                   />
                 </BarChart>
               </ResponsiveContainer>
-              {loading ? (
+              {loading && !isEditMode ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-secondary)]/50 z-10 backdrop-blur-[1px]">
                   <Loader2 className="animate-spin text-[var(--accent-indigo)]" />
                 </div>
               ) : null}
             </div>
+            
+            {/* Admin Edit Mode Table */}
+            {isEditMode && isAdmin && (
+              <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
+                <div className="flex justify-between items-center mb-4">
+                  <h4 className="text-sm font-bold text-[var(--text-primary)]">Edit Option Chain ({analysisIndex})</h4>
+                  <button 
+                    onClick={handleSaveOiData}
+                    disabled={saving}
+                    className="px-4 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-bold rounded flex items-center gap-2 transition-colors disabled:opacity-50"
+                  >
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : null}
+                    Save Changes
+                  </button>
+                </div>
+                <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
+                  <table className="w-full text-right text-xs bg-[var(--bg-tertiary)]">
+                    <thead>
+                      <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)]">
+                        <th className="p-2 text-center">Strike</th>
+                        <th className="p-2">Call OI</th>
+                        <th className="p-2">Put OI</th>
+                        <th className="p-2">Call Change</th>
+                        <th className="p-2">Put Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rawOiData.map((row, i) => (
+                        <tr key={i} className="border-b border-[var(--border-subtle)] last:border-0">
+                          <td className="p-2 font-mono font-bold text-center text-[var(--text-primary)]">{row.strike}</td>
+                          <td className="p-2">
+                            <input 
+                              type="text" 
+                              value={row.callOI} 
+                              onChange={(e) => handleOiChange(i, 'callOI', e.target.value)}
+                              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded px-2 py-1 outline-none focus:border-cyan-500 font-mono text-cyan-400 text-right"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              type="text" 
+                              value={row.putOI} 
+                              onChange={(e) => handleOiChange(i, 'putOI', e.target.value)}
+                              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded px-2 py-1 outline-none focus:border-orange-500 font-mono text-orange-400 text-right"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              type="text" 
+                              value={row.callChange} 
+                              onChange={(e) => handleOiChange(i, 'callChange', e.target.value)}
+                              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded px-2 py-1 outline-none focus:border-[var(--accent-indigo)] font-mono text-right"
+                            />
+                          </td>
+                          <td className="p-2">
+                            <input 
+                              type="text" 
+                              value={row.putChange} 
+                              onChange={(e) => handleOiChange(i, 'putChange', e.target.value)}
+                              className="w-full bg-[var(--bg-secondary)] border border-[var(--border-subtle)] rounded px-2 py-1 outline-none focus:border-[var(--accent-indigo)] font-mono text-right"
+                            />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
 
             {/* Bottom Controls Toggle */}
             <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
