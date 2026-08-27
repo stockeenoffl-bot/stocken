@@ -33,7 +33,6 @@ export default function Home() {
   useEffect(() => {
     async function loadAnalyses() {
       try {
-        setLoading(true)
         // Note: For now we fetch 'free' and rely on RLS/filtering to limit PRO access later, 
         // or we fetch all published and restrict in UI for demo purposes.
         // If the user has a PRO subscription, they'd get PRO data via backend logic.
