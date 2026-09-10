@@ -8,6 +8,9 @@ import DashboardLayout from '@/components/layout/DashboardLayout'
 import Landing from '@/pages/Landing'
 import Login from '@/pages/Login'
 import Register from '@/pages/Register'
+import ForgotPassword from '@/pages/ForgotPassword'
+import Terms from '@/pages/Terms'
+import Privacy from '@/pages/Privacy'
 import Dashboard from '@/pages/Dashboard'
 import Create from '@/pages/Create'
 import Preview from '@/pages/Preview'
@@ -17,7 +20,7 @@ import Subscriptions from '@/pages/Subscriptions'
 import Notifications from '@/pages/Notifications'
 import Learning from '@/pages/Learning'
 import Security from '@/pages/Security'
-import Home from '@/pages/Home' // We'll create this or use existing
+import Home from '@/pages/Home'
 
 export default function App() {
   return (
@@ -25,9 +28,13 @@ export default function App() {
       <MarketProvider>
         <AnalysisProvider>
           <Routes>
-            {/* Public Routes */}
+            {/* Top-Level Public Routes - Accessible to anyone with or without sign in */}
             <Route path="/" element={<Landing />} />
-            
+            <Route path="/terms" element={<Terms />} />
+            <Route path="/privacy" element={<Privacy />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+
+            {/* Guest-Only Auth Routes */}
             <Route element={<PublicRoute />}>
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
@@ -48,11 +55,9 @@ export default function App() {
               </Route>
             </Route>
 
-            {/* Client Routes - We'll reuse DashboardLayout or create a ClientLayout later */}
+            {/* Client Routes */}
             <Route element={<ClientRoute />}>
-              <Route path="/app" element={
-                <DashboardLayout isClient={true} />
-              }>
+              <Route path="/app" element={<DashboardLayout isClient={true} />}>
                 <Route index element={<Home />} />
                 <Route path="oi" element={<OI />} />
                 <Route path="learning" element={<Learning />} />
@@ -60,7 +65,6 @@ export default function App() {
                 <Route path="subscription" element={<Subscriptions isClient={true} />} />
               </Route>
             </Route>
-            
           </Routes>
         </AnalysisProvider>
       </MarketProvider>

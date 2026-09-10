@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import {
   TrendingUp,
   X,
@@ -612,11 +612,28 @@ export default function Landing() {
               </ul>
             </div>
             <div>
-              <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Company</h4>
+              <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Legal & Company</h4>
               <ul className="space-y-2">
-                {['Terms of Use', 'Privacy Policy', 'Refund Policy', 'Careers', 'Terms of Service'].map((l) => (
-                  <li key={l}><span className="text-xs" style={{ color: 'var(--text-muted)' }}>{l}</span></li>
-                ))}
+                <li>
+                  <Link to="/terms" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    Terms of Service
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/privacy" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms#regulatory" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    SEBI Disclaimers
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/terms#billing" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    Refund Policy
+                  </Link>
+                </li>
               </ul>
             </div>
             <div>
