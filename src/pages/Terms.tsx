@@ -62,6 +62,30 @@ export default function Terms() {
               Privacy Policy
             </Link>
             <Link
+              to="/sebi-disclaimer"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              SEBI Disclaimer
+            </Link>
+            <Link
+              to="/refund-policy"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              Refund Policy
+            </Link>
+            <Link
+              to="/about"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              About
+            </Link>
+            <Link
+              to="/contact"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              Contact
+            </Link>
+            <Link
               to="/login"
               className="px-3 py-1.5 rounded-md bg-[var(--accent-indigo)] text-white font-medium hover:brightness-110 transition-all"
             >
@@ -96,7 +120,7 @@ export default function Terms() {
             className="text-sm text-[var(--text-secondary)] max-w-2xl mx-auto"
           >
             Last Updated: January 2025. Please review these terms carefully before accessing or
-            using TradeHub / Zonal Edge.
+            using Zonal Edge.
           </motion.p>
         </div>
       </div>
@@ -143,7 +167,7 @@ export default function Terms() {
                       Important Statutory & SEBI Regulatory Notice
                     </h3>
                     <p className="text-xs text-amber-200/90 leading-relaxed">
-                      <strong>TradeHub / Zonal Edge is NOT a SEBI-registered Investment Adviser (RIA) or Research Analyst (RA).</strong>{' '}
+                      <strong>Zonal Edge is NOT a SEBI-registered Investment Adviser (RIA) or Research Analyst (RA).</strong>{' '}
                       All market analysis, Open Interest (OI) heatmaps, candlestick charts, algorithmic models,
                       and educational courses provided on this platform are for <strong>educational and informational purposes only</strong>.
                       Nothing contained herein constitutes financial advice, investment recommendations, or an offer to buy or sell securities.
@@ -158,9 +182,9 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  By accessing this website, mobile web application, or connected communication channels
-                  (including Telegram bots and email notifications), you acknowledge and agree that TradeHub
-                  acts solely as a technology-driven educational analytics portal.
+                  By accessing Zonal Edge, including our daily zone outlook, community chats, and alert feeds
+                  (including Telegram bots and email notifications), you acknowledge and agree that Zonal Edge
+                  acts solely as a technology-driven educational analytics portal and does not guarantee trading profits or protection against capital losses.
                 </p>
                 <p>
                   Any commentary on the Indian Stock Market (including NIFTY 50, BANK NIFTY, SENSEX, and
@@ -180,7 +204,7 @@ export default function Terms() {
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
                   These Terms of Service constitute a legally binding agreement between you ("User", "you")
-                  and TradeHub ("Company", "we", "us"). By checking the acceptance box during registration or
+                  and Zonal Edge ("Company", "we", "us"). By checking the acceptance box during registration or
                   by browsing the platform, you confirm that:
                 </p>
                 <ul className="list-disc pl-5 space-y-1.5 text-[var(--text-secondary)]">
@@ -262,8 +286,8 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  All content, charts, educational courses, UI designs, codebases, algorithms, Open Interest visualizations,
-                  and trademarks displayed on TradeHub are the exclusive property of TradeHub / Zonal Edge.
+                  All proprietary intellectual property, including zone calculations, educational coursework, videos,
+                  visual branding, UI designs, and trademarks displayed on Zonal Edge are the exclusive property of Zonal Edge.
                 </p>
                 <p>
                   You are granted a limited, personal, non-exclusive, non-transferable license to access the platform.
@@ -298,8 +322,8 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  To the maximum extent permitted by applicable Indian law, TradeHub, its creators, analysts, and
-                  affiliates shall not be liable for any direct, indirect, punitive, incidental, or consequential damages,
+                  To the maximum extent permitted by applicable Indian law, Zonal Edge, its creators, analysts, and
+                  affiliates shall NOT be liable for any direct, indirect, incidental, punitive, or consequential damages,
                   including but not limited to financial losses, loss of profits, trading drawdowns, or data loss arising out of
                   the use or inability to use this platform.
                 </p>
@@ -336,8 +360,8 @@ export default function Terms() {
                   For inquiries, technical support, or clarification regarding these Terms of Service, please reach out to:
                 </p>
                 <div className="p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-1">
-                  <p className="font-semibold text-[var(--text-primary)]">TradeHub Support & Legal Team</p>
-                  <p className="text-[var(--text-muted)]">Email: support@tradehub.in</p>
+                  <p className="font-semibold text-[var(--text-primary)]">Zonal Edge Support & Legal Team</p>
+                  <p className="text-[var(--text-muted)]">Email: support@zonaledge.in</p>
                   <p className="text-[var(--text-muted)]">Location: Tamil Nadu, India</p>
                 </div>
               </div>
@@ -349,10 +373,14 @@ export default function Terms() {
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 TradeHub / Zonal Edge. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+          <p>© 2025 Zonal Edge. All rights reserved.</p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors">SEBI Disclaimer</Link>
+            <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
+            <Link to="/about" className="hover:text-white transition-colors">About Us</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact Us</Link>
             <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
           </div>
         </div>

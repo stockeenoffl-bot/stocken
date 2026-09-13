@@ -20,7 +20,9 @@ import {
   Youtube,
   Linkedin,
   Instagram,
+  LineChart,
 } from 'lucide-react'
+import TradingViewChart from '@/components/charts/TradingViewChart'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -65,8 +67,15 @@ export default function Landing() {
               <span className="text-[8px] uppercase tracking-widest block" style={{ color: 'var(--text-muted)' }}>Trade with Clarity</span>
             </div>
           </div>
-          <div className="hidden md:flex items-center gap-8">
-            {['Dashboard', 'Pricing', 'History', 'Features', 'About'].map((item) => (
+          <div className="hidden md:flex items-center gap-6">
+            <button
+              onClick={() => scrollToSection('live-chart')}
+              className="text-xs font-medium transition-colors hover:text-white flex items-center gap-1"
+              style={{ color: 'var(--accent-indigo)' }}
+            >
+              <LineChart size={13} /> Live Chart
+            </button>
+            {['Pricing', 'Features'].map((item) => (
               <button
                 key={item}
                 onClick={() => scrollToSection(item.toLowerCase())}
@@ -76,6 +85,20 @@ export default function Landing() {
                 {item}
               </button>
             ))}
+            <Link
+              to="/about"
+              className="text-xs font-medium transition-colors hover:text-white"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              About Us
+            </Link>
+            <Link
+              to="/contact"
+              className="text-xs font-medium transition-colors hover:text-white"
+              style={{ color: 'var(--text-secondary)' }}
+            >
+              Contact
+            </Link>
           </div>
           <div className="flex items-center gap-3">
             <button
@@ -235,7 +258,7 @@ export default function Landing() {
             viewport={{ once: true }}
           >
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border mb-4" style={{ backgroundColor: 'rgba(99,102,241,0.1)', borderColor: 'rgba(99,102,241,0.3)' }}>
-              <span className="text-[11px] font-medium" style={{ color: 'var(--accent-indigo)' }}>The Structra Solution</span>
+              <span className="text-[11px] font-medium" style={{ color: 'var(--accent-indigo)' }}>The Zonal Edge Solution</span>
             </div>
             <h2 className="text-2xl md:text-3xl font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
               We simplify the market into one clear plan.
@@ -270,6 +293,40 @@ export default function Landing() {
           >
             <img src="/images/dashboard-preview.png" alt="Dashboard Preview" className="w-full" />
           </motion.div>
+        </div>
+      </section>
+
+      {/* Live TradingView Interactive Chart Showcase */}
+      <section id="live-chart" className="py-16 px-6 border-t border-b" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}>
+        <div className="max-w-6xl mx-auto space-y-6">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border mb-3" style={{ backgroundColor: 'rgba(99,102,241,0.1)', borderColor: 'rgba(99,102,241,0.3)' }}>
+                <LineChart size={13} style={{ color: 'var(--accent-indigo)' }} />
+                <span className="text-[11px] font-semibold" style={{ color: 'var(--accent-indigo)' }}>Live Market Terminal</span>
+              </div>
+              <h2 className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                Test-Drive the Live TradingView Chart
+              </h2>
+              <p className="text-xs md:text-sm mt-1 max-w-xl" style={{ color: 'var(--text-secondary)' }}>
+                Real-time tick streaming with full drawing and marking toolbars. Draw your supply and demand zones, trace trendlines, calculate Fibonacci ratios, or test indicators live.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/register')}
+                className="px-4 py-2 rounded-md text-xs font-semibold text-white transition-all hover:brightness-110"
+                style={{ backgroundColor: 'var(--accent-indigo)' }}
+              >
+                Unlock Pro Zones →
+              </button>
+            </div>
+          </div>
+
+          <div className="shadow-2xl rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-subtle)' }}>
+            <TradingViewChart defaultSymbol="NSE:NIFTY" height={520} />
+          </div>
         </div>
       </section>
 
@@ -625,13 +682,23 @@ export default function Landing() {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/terms#regulatory" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
-                    SEBI Disclaimers
+                  <Link to="/sebi-disclaimer" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    SEBI Disclaimer
                   </Link>
                 </li>
                 <li>
-                  <Link to="/terms#billing" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                  <Link to="/refund-policy" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
                     Refund Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/about" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    About Us
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/contact" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                    Contact Us
                   </Link>
                 </li>
               </ul>

@@ -1,5 +1,5 @@
 -- Run this script in the Supabase SQL Editor to make an account an Admin.
--- Replace 'YOUR_EMAIL@DOMAIN.COM' with the email address you signed up with on your TradeHub app.
+-- Replace 'YOUR_EMAIL@DOMAIN.COM' with the email address you signed up with on your Zonal Edge app.
 
 UPDATE public.profiles
 SET role = 'super_admin'

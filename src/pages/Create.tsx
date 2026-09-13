@@ -12,6 +12,7 @@ import {
   Send,
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
+import TradingViewChart from '@/components/charts/TradingViewChart'
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { analysisService } from '@/services/analysisService'
@@ -33,7 +34,10 @@ export default function Create() {
   const [bias, setBias] = useState<'Bullish' | 'Bearish' | 'Neutral'>(analysis.overallBias)
   const [markets, setMarkets] = useState<any[]>([])
   const [selectedMarketId, setSelectedMarketId] = useState<string>('')
+  const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
   const [isSaving, setIsSaving] = useState(false)
+
+  const currentMarketName = markets.find((m) => m.id === selectedMarketId)?.name || 'NIFTY 50'
 
   useEffect(() => {
     async function loadMarkets() {
@@ -129,12 +133,46 @@ export default function Create() {
       </motion.div>
 
       {/* Step 2: Market Chart */}
-      <motion.div variants={item}>
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: 'var(--accent-indigo)' }}>2</div>
-          <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Market Chart (NIFTY 50 &middot; 15m &middot; NSE)</h3>
+      <motion.div variants={item} className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-white" style={{ backgroundColor: 'var(--accent-indigo)' }}>2</div>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+              Interactive Chart ({currentMarketName}) &middot; Mark & Plan Zones
+            </h3>
+          </div>
+          <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
+            <button
+              onClick={() => setChartMode('tradingview')}
+              className={`px-3 py-1 rounded-md font-medium transition-all ${
+                chartMode === 'tradingview'
+                  ? 'bg-[var(--accent-indigo)] text-white'
+                  : 'text-[var(--text-secondary)] hover:text-white'
+              }`}
+            >
+              TradingView Live (Draw & Mark)
+            </button>
+            <button
+              onClick={() => setChartMode('system')}
+              className={`px-3 py-1 rounded-md font-medium transition-all ${
+                chartMode === 'system'
+                  ? 'bg-[var(--accent-indigo)] text-white'
+                  : 'text-[var(--text-secondary)] hover:text-white'
+              }`}
+            >
+              Lightweight View
+            </button>
+          </div>
         </div>
-        <CandlestickChart />
+
+        {chartMode === 'tradingview' ? (
+          <TradingViewChart
+            defaultSymbol={currentMarketName === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
+            height={520}
+          />
+        ) : (
+          <CandlestickChart />
+        )}
       </motion.div>
 
       {/* Step 3 & 4: Zones + Bias */}

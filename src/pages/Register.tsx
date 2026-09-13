@@ -140,7 +140,7 @@ export default function Register() {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Create an Account</h1>
           <p className="text-xs text-[var(--text-muted)] mt-1.5">
-            Join TradeHub to access real-time charts & market analytics
+            Join Zonal Edge to access real-time charts & market analytics
           </p>
         </div>
 
@@ -334,7 +334,7 @@ export default function Register() {
                     <ShieldAlert size={14} /> Statutory Regulatory Disclaimer (SEBI)
                   </p>
                   <p className="text-amber-200/90 text-[11px]">
-                    TradeHub / Zonal Edge is solely an educational and analytical charting tool. We are NOT
+                    Zonal Edge is solely an educational and analytical charting tool. We are NOT
                     SEBI-registered Investment Advisers or Research Analysts. We do not provide buy/sell signals,
                     portfolio management, or guaranteed returns.
                   </p>

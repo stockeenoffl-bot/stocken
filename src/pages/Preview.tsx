@@ -4,6 +4,7 @@ import { Eye, Smartphone, Monitor, ShieldCheck, Calendar, ArrowUpRight } from 'l
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useMarket } from '@/contexts/MarketContext'
 import CandlestickChart from '@/components/charts/CandlestickChart'
+import TradingViewChart from '@/components/charts/TradingViewChart'
 
 const container = {
   hidden: { opacity: 0 },
@@ -19,6 +20,7 @@ export default function Preview() {
   const { analysis } = useAnalysis()
   const { market } = useMarket()
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop')
+  const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -112,9 +114,44 @@ export default function Preview() {
               </h2>
             </div>
 
-            {/* Interactive Chart */}
-            <div className="rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-              <CandlestickChart />
+            {/* Interactive Chart with Mode Toggle */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-[var(--text-primary)]">Preview Chart</span>
+                <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
+                  <button
+                    onClick={() => setChartMode('tradingview')}
+                    className={`px-3 py-1 rounded-md font-medium transition-all ${
+                      chartMode === 'tradingview'
+                        ? 'bg-[var(--accent-indigo)] text-white'
+                        : 'text-[var(--text-secondary)] hover:text-white'
+                    }`}
+                  >
+                    TradingView Live
+                  </button>
+                  <button
+                    onClick={() => setChartMode('system')}
+                    className={`px-3 py-1 rounded-md font-medium transition-all ${
+                      chartMode === 'system'
+                        ? 'bg-[var(--accent-indigo)] text-white'
+                        : 'text-[var(--text-secondary)] hover:text-white'
+                    }`}
+                  >
+                    System View
+                  </button>
+                </div>
+              </div>
+
+              <div className="rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+                {chartMode === 'tradingview' ? (
+                  <TradingViewChart
+                    defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
+                    height={viewMode === 'mobile' ? 420 : 500}
+                  />
+                ) : (
+                  <CandlestickChart />
+                )}
+              </div>
             </div>
 
             {/* Analysis Summary Blocks */}

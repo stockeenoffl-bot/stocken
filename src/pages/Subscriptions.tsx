@@ -107,7 +107,7 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
         key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_yourkey', // This is exposed in vite env in real app, but order is secure
         amount: plan.price * 100,
         currency: 'INR',
-        name: 'TradeHub',
+        name: 'Zonal Edge',
         description: `${plan.name} Subscription`,
         order_id: orderId,
         handler: function (_response: any) {

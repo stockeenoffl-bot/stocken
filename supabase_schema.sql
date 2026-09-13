@@ -1,4 +1,4 @@
--- TradeHub Supabase Schema Initialization
+-- Zonal Edge Supabase Schema Initialization
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";

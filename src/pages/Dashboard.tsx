@@ -9,6 +9,7 @@ import {
   Target
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
+import TradingViewChart from '@/components/charts/TradingViewChart'
 import StatCard from '@/components/StatCard'
 import { useMarket } from '@/contexts/MarketContext'
 import { userService } from '@/services/userService'
@@ -28,6 +29,7 @@ export default function Dashboard() {
   const [activeSubTab, setActiveSubTab] = useState('analysis')
   const [stats, setStats] = useState({ totalUsers: 0, proUsers: 0 })
   const [recentUsers, setRecentUsers] = useState<any[]>([])
+  const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
 
   useEffect(() => {
     async function fetchStats() {
@@ -96,9 +98,47 @@ export default function Dashboard() {
                 <StatCard label="Invalid Below" value="24,100" sentiment="bearish" sublabel="Trend invalidation" icon={<TrendingDown size={18} />} />
               </div>
 
-              {/* Chart */}
-              <div>
-                <CandlestickChart />
+              {/* Chart with Mode Toggle */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-[var(--text-primary)]">Technical Chart</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                      Live Real-Time
+                    </span>
+                  </div>
+                  <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
+                    <button
+                      onClick={() => setChartMode('tradingview')}
+                      className={`px-3 py-1 rounded-md font-medium transition-all ${
+                        chartMode === 'tradingview'
+                          ? 'bg-[var(--accent-indigo)] text-white'
+                          : 'text-[var(--text-secondary)] hover:text-white'
+                      }`}
+                    >
+                      TradingView Pro (Live + Draw)
+                    </button>
+                    <button
+                      onClick={() => setChartMode('system')}
+                      className={`px-3 py-1 rounded-md font-medium transition-all ${
+                        chartMode === 'system'
+                          ? 'bg-[var(--accent-indigo)] text-white'
+                          : 'text-[var(--text-secondary)] hover:text-white'
+                      }`}
+                    >
+                      Zonal Edge View
+                    </button>
+                  </div>
+                </div>
+
+                {chartMode === 'tradingview' ? (
+                  <TradingViewChart
+                    defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
+                    height={540}
+                  />
+                ) : (
+                  <CandlestickChart />
+                )}
               </div>
 
               {/* Analysis + Status */}

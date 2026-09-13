@@ -13,10 +13,13 @@ import {
   ChevronRight,
   Gem,
   BarChart3,
+  LineChart,
 } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 const adminNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/chart', label: 'Live Chart', icon: LineChart },
   { path: '/users', label: 'User Management', icon: Users },
   { path: '/subscriptions', label: 'Subscription Management', icon: CreditCard },
   { path: '/notifications', label: 'Notifications', icon: Bell },
@@ -29,6 +32,7 @@ const adminNavItems = [
 
 const clientNavItems = [
   { path: '/app', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/app/chart', label: 'Live Chart', icon: LineChart },
   { path: '/app/oi', label: 'OI Analysis', icon: BarChart3 },
   { path: '/app/learning', label: 'Learning', icon: GraduationCap },
   { path: '/app/notifications', label: 'Notifications', icon: Bell },
@@ -101,15 +105,19 @@ export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
       </div>
 
       {/* Support */}
-      <div className="mx-3 mb-4 p-3 rounded-lg border" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-subtle)' }}>
+      <Link
+        to="/contact"
+        className="mx-3 mb-4 p-3 rounded-lg border block hover:border-[var(--accent-indigo)] transition-colors"
+        style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-subtle)' }}
+      >
         <div className="flex items-center gap-2">
-          <Headphones size={16} style={{ color: 'var(--text-muted)' }} />
+          <Headphones size={16} style={{ color: 'var(--accent-indigo)' }} />
           <div>
             <div className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>Need Help?</div>
-            <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Contact Support</div>
+            <div className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Contact Support Desk</div>
           </div>
         </div>
-      </div>
+      </Link>
     </aside>
   )
 }

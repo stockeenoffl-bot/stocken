@@ -64,6 +64,30 @@ export default function Privacy() {
               Terms of Service
             </Link>
             <Link
+              to="/sebi-disclaimer"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              SEBI Disclaimer
+            </Link>
+            <Link
+              to="/refund-policy"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              Refund Policy
+            </Link>
+            <Link
+              to="/about"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              About
+            </Link>
+            <Link
+              to="/contact"
+              className="text-[var(--text-secondary)] hover:text-white transition-colors"
+            >
+              Contact
+            </Link>
+            <Link
               to="/login"
               className="px-3 py-1.5 rounded-md bg-[var(--accent-indigo)] text-white font-medium hover:brightness-110 transition-all"
             >
@@ -97,8 +121,8 @@ export default function Privacy() {
             transition={{ delay: 0.1 }}
             className="text-sm text-[var(--text-secondary)] max-w-2xl mx-auto"
           >
-            Last Updated: January 2025. Learn how TradeHub / Zonal Edge protects, uses, and respects
-            your personal information.
+            Last Updated: January 2025. Learn how Zonal Edge protects, uses, and respects
+            your personal and transactional data.
           </motion.p>
         </div>
       </div>
@@ -143,8 +167,9 @@ export default function Privacy() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  TradeHub / Zonal Edge ("we", "our", or "us") respects your privacy and is committed to protecting
-                  the personal data of all users who access our educational platform, analytics dashboards, and mobile services.
+                  Zonal Edge ("we", "our", or "us") respects your privacy and is committed to protecting
+                  the personal data of all users, visitors, and subscribers. This Privacy Policy explains our practices
+                  regarding data collection, storage, and processing.
                 </p>
                 <p>
                   This Privacy Policy outlines the types of personal and analytical information we collect, how it is stored
@@ -216,15 +241,17 @@ export default function Privacy() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  All online payments on TradeHub are processed through <strong>Razorpay</strong>, a PCI-DSS Level 1 certified payment aggregator.
+                  All online payments on Zonal Edge are processed through <strong>Razorpay</strong>, a PCI-DSS Level 1 certified payment aggregator.
+                  When you subscribe to our pro plan or courses:
                 </p>
-                <div className="p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-2">
-                  <p className="font-semibold text-[var(--text-primary)]">Zero Storage of Sensitive Card/Banking Data:</p>
-                  <p className="text-[var(--text-muted)]">
-                    TradeHub does NOT store, process, or have access to your credit/debit card numbers, CVVs, net banking credentials, or UPI PINs.
-                    All transaction credentials are encrypted directly through Razorpay's compliant infrastructure.
-                  </p>
-                </div>
+                <ul className="list-disc pl-5 space-y-1 text-[var(--text-secondary)]">
+                  <li>
+                    Zonal Edge does NOT store, process, or have access to your credit/debit card numbers, CVVs, net banking credentials, or UPI PINs.
+                  </li>
+                </ul>
+                <p className="text-[var(--text-muted)]">
+                  All transaction credentials are encrypted directly through Razorpay's compliant infrastructure.
+                </p>
               </div>
             </section>
 
@@ -287,7 +314,7 @@ export default function Privacy() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  TradeHub complies with the Digital Personal Data Protection Act, 2023 (DPDPA) of India.
+                  Zonal Edge complies with the Digital Personal Data Protection Act, 2023 (DPDPA) of India.
                   We process personal data based on your lawful and informed consent, which you freely provide when
                   accepting this Privacy Policy during registration.
                 </p>
@@ -307,8 +334,8 @@ export default function Privacy() {
                 </p>
                 <div className="p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-1">
                   <p className="font-semibold text-[var(--text-primary)]">Data Grievance Officer</p>
-                  <p className="text-[var(--text-muted)]">Platform: TradeHub / Zonal Edge</p>
-                  <p className="text-[var(--text-muted)]">Email: privacy@tradehub.in</p>
+                  <p className="text-[var(--text-muted)]">Platform: Zonal Edge</p>
+                  <p className="text-[var(--text-muted)]">Email: privacy@zonaledge.in</p>
                   <p className="text-[var(--text-muted)]">Location: Tamil Nadu, India</p>
                 </div>
               </div>
@@ -320,10 +347,14 @@ export default function Privacy() {
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 TradeHub / Zonal Edge. All rights reserved.</p>
-          <div className="flex items-center gap-4">
-            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+          <p>© 2025 Zonal Edge. All rights reserved.</p>
+          <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+            <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
+            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors">SEBI Disclaimer</Link>
+            <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
+            <Link to="/about" className="hover:text-white transition-colors">About Us</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact Us</Link>
             <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
           </div>
         </div>

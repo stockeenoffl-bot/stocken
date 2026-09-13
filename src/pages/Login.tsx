@@ -64,7 +64,7 @@ export default function Login() {
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Welcome Back</h1>
           <p className="text-xs text-[var(--text-muted)] mt-1.5">
-            Sign in to your TradeHub account
+            Sign in to your Zonal Edge account
           </p>
         </div>
 

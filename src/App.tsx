@@ -11,6 +11,11 @@ import Register from '@/pages/Register'
 import ForgotPassword from '@/pages/ForgotPassword'
 import Terms from '@/pages/Terms'
 import Privacy from '@/pages/Privacy'
+import SebiDisclaimer from '@/pages/SebiDisclaimer'
+import RefundPolicy from '@/pages/RefundPolicy'
+import AboutUs from '@/pages/AboutUs'
+import ContactUs from '@/pages/ContactUs'
+import LiveChartPage from '@/pages/LiveChartPage'
 import Dashboard from '@/pages/Dashboard'
 import Create from '@/pages/Create'
 import Preview from '@/pages/Preview'
@@ -32,6 +37,10 @@ export default function App() {
             <Route path="/" element={<Landing />} />
             <Route path="/terms" element={<Terms />} />
             <Route path="/privacy" element={<Privacy />} />
+            <Route path="/sebi-disclaimer" element={<SebiDisclaimer />} />
+            <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/about" element={<AboutUs />} />
+            <Route path="/contact" element={<ContactUs />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
 
             {/* Guest-Only Auth Routes */}
@@ -44,6 +53,7 @@ export default function App() {
             <Route element={<AdminRoute />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/chart" element={<LiveChartPage />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/subscriptions" element={<Subscriptions />} />
                 <Route path="/notifications" element={<Notifications />} />
@@ -59,6 +69,7 @@ export default function App() {
             <Route element={<ClientRoute />}>
               <Route path="/app" element={<DashboardLayout isClient={true} />}>
                 <Route index element={<Home />} />
+                <Route path="chart" element={<LiveChartPage />} />
                 <Route path="oi" element={<OI />} />
                 <Route path="learning" element={<Learning />} />
                 <Route path="notifications" element={<Notifications />} />
