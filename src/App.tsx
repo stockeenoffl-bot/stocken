@@ -26,6 +26,7 @@ import Notifications from '@/pages/Notifications'
 import Learning from '@/pages/Learning'
 import Security from '@/pages/Security'
 import Home from '@/pages/Home'
+import IndianMarkets from '@/pages/IndianMarkets'
 
 export default function App() {
   return (
@@ -53,6 +54,7 @@ export default function App() {
             <Route element={<AdminRoute />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/indian-markets" element={<IndianMarkets />} />
                 <Route path="/chart" element={<LiveChartPage />} />
                 <Route path="/users" element={<Users />} />
                 <Route path="/subscriptions" element={<Subscriptions />} />
@@ -69,6 +71,7 @@ export default function App() {
             <Route element={<ClientRoute />}>
               <Route path="/app" element={<DashboardLayout isClient={true} />}>
                 <Route index element={<Home />} />
+                <Route path="indian-markets" element={<IndianMarkets />} />
                 <Route path="chart" element={<LiveChartPage />} />
                 <Route path="oi" element={<OI />} />
                 <Route path="learning" element={<Learning />} />

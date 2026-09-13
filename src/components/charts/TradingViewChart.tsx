@@ -25,13 +25,38 @@ interface TradingViewChartProps {
   className?: string
 }
 
-const PRESET_SYMBOLS = [
-  { label: 'NIFTY 50', symbol: 'NSE:NIFTY', desc: 'National Stock Exchange 50' },
-  { label: 'BANK NIFTY', symbol: 'NSE:BANKNIFTY', desc: 'Banking Sector Index' },
-  { label: 'SENSEX', symbol: 'BSE:SENSEX', desc: 'Bombay Stock Exchange 30' },
-  { label: 'FIN NIFTY', symbol: 'NSE:FINNIFTY', desc: 'Financial Services Index' },
-  { label: 'MIDCPNIFTY', symbol: 'NSE:MIDCPNIFTY', desc: 'Midcap Select Index' },
-  { label: 'RELIANCE', symbol: 'NSE:RELIANCE', desc: 'Market Bellwether' },
+type SymbolCategory = 'indices' | 'banking' | 'bluechips'
+
+interface PresetSymbol {
+  label: string
+  symbol: string
+  desc: string
+  category: SymbolCategory
+}
+
+const PRESET_SYMBOLS: PresetSymbol[] = [
+  // Indian Indices
+  { label: 'NIFTY 50', symbol: 'NSE:NIFTY', desc: 'National Stock Exchange 50', category: 'indices' },
+  { label: 'BANK NIFTY', symbol: 'NSE:BANKNIFTY', desc: 'Banking Sector Index', category: 'indices' },
+  { label: 'SENSEX', symbol: 'BSE:SENSEX', desc: 'Bombay Stock Exchange 30', category: 'indices' },
+  { label: 'FIN NIFTY', symbol: 'NSE:FINNIFTY', desc: 'Financial Services Index', category: 'indices' },
+  { label: 'MIDCPNIFTY', symbol: 'NSE:MIDCPNIFTY', desc: 'Midcap Select Index', category: 'indices' },
+  { label: 'INDIA VIX', symbol: 'NSE:INDIAVIX', desc: 'India Volatility Index', category: 'indices' },
+
+  // Indian Banking Heavyweights
+  { label: 'HDFC BANK', symbol: 'NSE:HDFCBANK', desc: 'HDFC Bank Ltd', category: 'banking' },
+  { label: 'ICICI BANK', symbol: 'NSE:ICICIBANK', desc: 'ICICI Bank Ltd', category: 'banking' },
+  { label: 'SBIN', symbol: 'NSE:SBIN', desc: 'State Bank of India', category: 'banking' },
+  { label: 'KOTAK', symbol: 'NSE:KOTAKBANK', desc: 'Kotak Mahindra Bank', category: 'banking' },
+  { label: 'AXIS BANK', symbol: 'NSE:AXISBANK', desc: 'Axis Bank Ltd', category: 'banking' },
+
+  // Indian Bluechips
+  { label: 'RELIANCE', symbol: 'NSE:RELIANCE', desc: 'Reliance Industries', category: 'bluechips' },
+  { label: 'TCS', symbol: 'NSE:TCS', desc: 'Tata Consultancy Services', category: 'bluechips' },
+  { label: 'INFOSYS', symbol: 'NSE:INFY', desc: 'Infosys Limited', category: 'bluechips' },
+  { label: 'TATA MOTORS', symbol: 'NSE:TATAMOTORS', desc: 'Tata Motors', category: 'bluechips' },
+  { label: 'L&T', symbol: 'NSE:LT', desc: 'Larsen & Toubro', category: 'bluechips' },
+  { label: 'ITC', symbol: 'NSE:ITC', desc: 'ITC Limited', category: 'bluechips' },
 ]
 
 export default function TradingViewChart({
@@ -45,6 +70,7 @@ export default function TradingViewChart({
   const containerId = `tv_chart_container_${containerUid}`
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const [activeCategory, setActiveCategory] = useState<SymbolCategory>('indices')
   const [currentSymbol, setCurrentSymbol] = useState(defaultSymbol)
   const [currentInterval, setCurrentInterval] = useState('15')
   const [isFullscreen, setIsFullscreen] = useState(false)
@@ -137,30 +163,62 @@ export default function TradingViewChart({
       {/* Quick Switcher & Toolbar Header */}
       {showQuickBar && (
         <div className="p-3 border-b border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3 bg-[var(--bg-tertiary)]/60 backdrop-blur-sm">
-          {/* Preset Buttons */}
-          <div className="flex flex-wrap items-center gap-1.5">
-            <div className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded bg-[var(--accent-indigo)]/10 text-[var(--accent-indigo)] text-[11px] font-bold tracking-wider mr-1">
-              <TrendingUp size={13} />
-              <span>LIVE FEED</span>
+          {/* Category Tabs + Preset Buttons */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] p-0.5">
+              {(
+                [
+                  { id: 'indices', label: 'Indices' },
+                  { id: 'banking', label: 'Banking' },
+                  { id: 'bluechips', label: 'Bluechips' },
+                ] as const
+              ).map((cat) => (
+                <button
+                  key={cat.id}
+                  onClick={() => {
+                    setActiveCategory(cat.id)
+                    const firstInCat = PRESET_SYMBOLS.find((s) => s.category === cat.id)
+                    if (
+                      firstInCat &&
+                      !PRESET_SYMBOLS.filter((s) => s.category === cat.id).some(
+                        (s) => s.symbol === currentSymbol
+                      )
+                    ) {
+                      setCurrentSymbol(firstInCat.symbol)
+                    }
+                  }}
+                  className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
+                    activeCategory === cat.id
+                      ? 'bg-[var(--accent-indigo)] text-white shadow-sm'
+                      : 'text-[var(--text-secondary)] hover:text-white'
+                  }`}
+                >
+                  {cat.label}
+                </button>
+              ))}
             </div>
 
-            {PRESET_SYMBOLS.map((s) => {
-              const active = currentSymbol === s.symbol
-              return (
-                <button
-                  key={s.symbol}
-                  onClick={() => setCurrentSymbol(s.symbol)}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
-                    active
-                      ? 'bg-[var(--accent-indigo)] text-white shadow-sm'
-                      : 'bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--border-active)]'
-                  }`}
-                  title={s.desc}
-                >
-                  {s.label}
-                </button>
-              )
-            })}
+            <div className="h-4 w-px bg-[var(--border-subtle)] hidden sm:block" />
+
+            <div className="flex flex-wrap items-center gap-1.5">
+              {PRESET_SYMBOLS.filter((s) => s.category === activeCategory).map((s) => {
+                const active = currentSymbol === s.symbol
+                return (
+                  <button
+                    key={s.symbol}
+                    onClick={() => setCurrentSymbol(s.symbol)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
+                      active
+                        ? 'bg-[var(--accent-indigo)] text-white shadow-sm ring-1 ring-white/20'
+                        : 'bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--border-active)]'
+                    }`}
+                    title={s.desc}
+                  >
+                    {s.label}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {/* Right Action Tools: Timeframes, Guide, Fullscreen */}

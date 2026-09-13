@@ -11,6 +11,10 @@ import {
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
 import StatCard from '@/components/StatCard'
+import {
+  TradingViewMarketQuotes,
+  TradingViewTechnicalAnalysis,
+} from '@/components/tradingview'
 import { useMarket } from '@/contexts/MarketContext'
 import { analysisService } from '@/services/analysisService'
 import { useAuth } from '@/contexts/AuthContext'
@@ -173,6 +177,39 @@ export default function Home() {
               </div>
             )) || <span className="text-xs text-[var(--text-muted)]">No zones defined.</span>}
             
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Indian Markets Live Pulse Section */}
+      <motion.div variants={itemVariants} className="space-y-3 pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-bold text-[var(--text-primary)]">
+              Indian Markets Live Watchlist & Sentiment
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+              TradingView Live
+            </span>
+          </div>
+          <Link
+            to="/app/indian-markets"
+            className="text-xs text-[var(--accent-indigo)] hover:underline font-semibold flex items-center gap-1"
+          >
+            <span>Open Indian Markets Command Center</span>
+            <span>&rarr;</span>
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <TradingViewMarketQuotes height={520} />
+          </div>
+          <div>
+            <TradingViewTechnicalAnalysis
+              defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
+              height={450}
+            />
           </div>
         </div>
       </motion.div>

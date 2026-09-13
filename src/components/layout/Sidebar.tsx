@@ -14,11 +14,13 @@ import {
   Gem,
   BarChart3,
   LineChart,
+  TrendingUp,
 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 const adminNavItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/indian-markets', label: 'Indian Markets', icon: TrendingUp, isLive: true },
   { path: '/chart', label: 'Live Chart', icon: LineChart },
   { path: '/users', label: 'User Management', icon: Users },
   { path: '/subscriptions', label: 'Subscription Management', icon: CreditCard },
@@ -32,6 +34,7 @@ const adminNavItems = [
 
 const clientNavItems = [
   { path: '/app', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/app/indian-markets', label: 'Indian Markets', icon: TrendingUp, isLive: true },
   { path: '/app/chart', label: 'Live Chart', icon: LineChart },
   { path: '/app/oi', label: 'OI Analysis', icon: BarChart3 },
   { path: '/app/learning', label: 'Learning', icon: GraduationCap },
@@ -85,7 +88,12 @@ export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
                 />
               )}
               <item.icon size={20} strokeWidth={1.5} />
-              <span className="text-xs">{item.label}</span>
+              <span className="text-xs flex-1">{item.label}</span>
+              {(item as any).isLive && (
+                <span className="px-1.5 py-0.5 rounded text-[9px] font-extrabold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 tracking-wider leading-none">
+                  LIVE
+                </span>
+              )}
             </NavLink>
           )
         })}

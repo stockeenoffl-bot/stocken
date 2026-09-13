@@ -6,11 +6,17 @@ import {
   CheckCircle2,
   FileText,
   BarChart3,
-  Target
+  Target,
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
 import StatCard from '@/components/StatCard'
+import {
+  TradingViewMarketQuotes,
+  TradingViewTechnicalAnalysis,
+  TradingViewStockHeatmap,
+  TradingViewIndianScreener,
+} from '@/components/tradingview'
 import { useMarket } from '@/contexts/MarketContext'
 import { userService } from '@/services/userService'
 
@@ -47,6 +53,7 @@ export default function Dashboard() {
 
   const subTabs = [
     { id: 'analysis', label: 'Index Analysis' },
+    { id: 'indian-markets', label: '🇮🇳 Indian Market Hub' },
     { id: 'total-users', label: 'Total Users' },
     { id: 'active-users', label: 'Active Users Today' },
     { id: 'premium-members', label: 'Premium Members' },
@@ -219,6 +226,65 @@ export default function Dashboard() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Indian Market Live Pulse Section */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-bold text-[var(--text-primary)]">
+                      Indian Markets Live Watchlist & Sentiment
+                    </span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                      TradingView Feeds
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <div className="lg:col-span-2">
+                    <TradingViewMarketQuotes height={520} />
+                  </div>
+                  <div>
+                    <TradingViewTechnicalAnalysis
+                      defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
+                      height={450}
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* INDIAN MARKET HUB TAB */}
+          {activeSubTab === 'indian-markets' && (
+            <div className="space-y-5">
+              <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                    <span>Indian Markets Live TradingView Widgets</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
+                      NSE & BSE
+                    </span>
+                  </h3>
+                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
+                    Real-time stock screener, sector heatmap, and institutional market quotes.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <TradingViewMarketQuotes height={560} />
+                </div>
+                <div>
+                  <TradingViewTechnicalAnalysis defaultSymbol="NSE:NIFTY" height={480} />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <TradingViewStockHeatmap height={560} />
+                <TradingViewIndianScreener height={560} />
               </div>
             </div>
           )}
