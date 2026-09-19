@@ -25,6 +25,7 @@ import Subscriptions from '@/pages/Subscriptions'
 import Notifications from '@/pages/Notifications'
 import Learning from '@/pages/Learning'
 import Security from '@/pages/Security'
+import Broker from '@/pages/Broker'
 import Home from '@/pages/Home'
 import IndianMarkets from '@/pages/IndianMarkets'
 
@@ -61,6 +62,7 @@ export default function App() {
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/learning" element={<Learning />} />
                 <Route path="/security" element={<Security />} />
+                <Route path="/broker" element={<Broker />} />
                 <Route path="/create" element={<Create />} />
                 <Route path="/preview" element={<Preview />} />
                 <Route path="/oi" element={<OI />} />

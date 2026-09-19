@@ -5,7 +5,8 @@ import {
   CheckCircle2,
   XCircle,
   Plus,
-  Loader2
+  Loader2,
+  Trash2,
 } from 'lucide-react'
 import { subscriptionService } from '@/services/subscriptionService'
 import { useAuth } from '@/contexts/AuthContext'
@@ -47,6 +48,17 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
     ])
     setNewCouponCode('')
     setNewCouponDiscount('')
+    toast.success(`Coupon ${newCouponCode.toUpperCase().trim()} added!`)
+  }
+
+  const handleDeleteCoupon = (code: string) => {
+    setCoupons(prev => prev.filter(c => c.code !== code))
+    toast.success(`Coupon ${code} removed`)
+  }
+
+  const handleToggleCouponStatus = (code: string) => {
+    setCoupons(prev => prev.map(c => c.code === code ? { ...c, status: c.status === 'Active' ? 'Expired' : 'Active' } : c))
+    toast.success(`Coupon status updated`)
   }
 
   // Webhook settings
@@ -463,6 +475,7 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
                       <th className="p-3">Value</th>
                       <th className="p-3">Type</th>
                       <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -472,11 +485,23 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
                         <td className="p-3">{coupon.discount}</td>
                         <td className="p-3">{coupon.type}</td>
                         <td className="p-3">
-                          <span className={`px-2 py-0.5 rounded text-[9px] font-bold ${
-                            coupon.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
-                          }`}>
+                          <button
+                            onClick={() => handleToggleCouponStatus(coupon.code)}
+                            className={`px-2 py-0.5 rounded text-[9px] font-bold ${
+                              coupon.status === 'Active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400'
+                            }`}
+                          >
                             {coupon.status}
-                          </span>
+                          </button>
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => handleDeleteCoupon(coupon.code)}
+                            className="p-1 text-[var(--text-muted)] hover:text-rose-400 transition-colors"
+                            title="Delete coupon"
+                          >
+                            <Trash2 size={13} />
+                          </button>
                         </td>
                       </tr>
                     ))}

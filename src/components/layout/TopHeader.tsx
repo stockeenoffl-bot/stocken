@@ -1,18 +1,32 @@
 import { useMarket } from '@/contexts/MarketContext'
 import { useAuth } from '@/contexts/AuthContext'
-import { Calendar, ChevronDown, LogOut, Bell } from 'lucide-react'
+import { Calendar, ChevronDown, LogOut, Bell, Cpu } from 'lucide-react'
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { notificationService } from '@/services/notificationService'
 import type { AppNotification } from '@/services/notificationService'
+import { aliceBlueService } from '@/services/aliceBlueService'
 import { toast } from 'sonner'
 
 export default function TopHeader() {
   const { market, setMarket } = useMarket()
   const { profile, signOut } = useAuth()
+  const navigate = useNavigate()
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
+  const [brokerConnected, setBrokerConnected] = useState(false)
+  const isAdmin = profile && ['super_admin', 'admin', 'analyst'].includes(profile.role)
+
+  useEffect(() => {
+    const updateBrokerStatus = () => {
+      setBrokerConnected(aliceBlueService.isConfigured() && aliceBlueService.isSessionActive())
+    }
+    updateBrokerStatus()
+    window.addEventListener('aliceblue-status-change', updateBrokerStatus)
+    return () => window.removeEventListener('aliceblue-status-change', updateBrokerStatus)
+  }, [])
 
   useEffect(() => {
     async function loadNotifications() {
@@ -76,7 +90,30 @@ export default function TopHeader() {
       </div>
 
       {/* Right - User */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3">
+        {/* Alice Blue Broker Status Pill for Admins */}
+        {isAdmin && (
+          <button
+            onClick={() => navigate('/broker')}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border ${
+              brokerConnected
+                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 hover:bg-emerald-500/20'
+                : 'bg-amber-500/10 text-amber-400 border-amber-500/25 hover:bg-amber-500/20'
+            }`}
+            title="Configure Alice Blue Broker API & Credentials"
+          >
+            <span
+              className={`w-1.5 h-1.5 rounded-full ${
+                brokerConnected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
+              }`}
+            />
+            <Cpu size={12} />
+            <span className="hidden sm:inline">
+              {brokerConnected ? 'Alice Blue: Active' : 'Alice Blue: Connect'}
+            </span>
+          </button>
+        )}
+
         {/* Notifications */}
         <div className="relative">
           <button 

@@ -1,11 +1,19 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import {
   Key,
   ToggleLeft,
   ToggleRight,
-  CheckCircle2
+  CheckCircle2,
+  Cpu,
+  Zap,
+  Globe,
+  RefreshCw,
+  ExternalLink,
+  ShieldCheck,
 } from 'lucide-react'
+import { aliceBlueService, type AliceBlueCredentials } from '@/services/aliceBlueService'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -30,17 +38,69 @@ export default function Security() {
   })
   const [toastMessage, setToastMessage] = useState('')
 
+  // Broker API credentials state
+  const [brokerCreds, setBrokerCreds] = useState<AliceBlueCredentials>({
+    userId: '',
+    appId: '',
+    apiSecret: '',
+    ipAddress: '',
+    environment: 'live',
+    dataFeedEnabled: true,
+  })
+  const [detectingIp, setDetectingIp] = useState(false)
+  const [generatingToken, setGeneratingToken] = useState(false)
+
+  useEffect(() => {
+    const loaded = aliceBlueService.loadCredentials()
+    if (loaded) setBrokerCreds(loaded)
+  }, [])
+
   const handleSave = (msg: string) => {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(''), 3000)
   }
 
+  const handleSaveBrokerCreds = () => {
+    aliceBlueService.saveCredentials(brokerCreds)
+    handleSave('Alice Blue broker credentials updated successfully!')
+  }
+
+  const handleDetectIp = async () => {
+    setDetectingIp(true)
+    try {
+      const ip = await aliceBlueService.detectPublicIp()
+      if (ip) {
+        setBrokerCreds((prev) => ({ ...prev, ipAddress: ip }))
+        handleSave(`Detected IPv4: ${ip}`)
+      }
+    } finally {
+      setDetectingIp(false)
+    }
+  }
+
+  const handleGenerateToken = async () => {
+    setGeneratingToken(true)
+    try {
+      const res = await aliceBlueService.generateSession()
+      if (res.success) {
+        const loaded = aliceBlueService.loadCredentials()
+        if (loaded) setBrokerCreds(loaded)
+        handleSave('Active session token generated!')
+      } else {
+        handleSave('Error: ' + (res.error || 'Failed to generate token'))
+      }
+    } finally {
+      setGeneratingToken(false)
+    }
+  }
+
   const subTabs = [
+    { id: 'broker-api', label: 'Alice Blue Broker API' },
     { id: 'two-factor', label: 'Two-factor authentication for admin' },
     { id: 'role-access', label: 'Role-based access' },
     { id: 'activity-logs', label: 'Activity logs' },
     { id: 'session-timeout', label: 'Automatic session timeout' },
-    { id: 'backup-export', label: 'Backup/export functionality' }
+    { id: 'backup-export', label: 'Backup/export functionality' },
   ]
 
   return (
@@ -98,6 +158,119 @@ export default function Security() {
           transition={{ duration: 0.2 }}
           className="rounded-xl border p-6 bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-6"
         >
+          {activeSubTab === 'broker-api' && (
+            <div className="space-y-6">
+              <div className="pb-4 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)] flex items-center gap-2">
+                    <Cpu size={16} className="text-[var(--accent-indigo)]" />
+                    Alice Blue ANT A3 Broker Integration
+                  </h3>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+                    Configure App ID, API Secret, Static IPv4, and session tokens for live Indian market trading & feeds.
+                  </p>
+                </div>
+
+                <Link
+                  to="/broker"
+                  className="flex items-center gap-1 text-xs font-semibold px-3 py-1.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] hover:border-[var(--accent-indigo)] w-fit"
+                >
+                  Open Full Broker Hub <ExternalLink size={12} />
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--text-primary)]">Client Code / User ID</label>
+                  <input
+                    type="text"
+                    value={brokerCreds.userId}
+                    onChange={(e) => setBrokerCreds({ ...brokerCreds, userId: e.target.value.toUpperCase().trim() })}
+                    placeholder="e.g. AB123456"
+                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-[var(--text-primary)]">App ID (API Key)</label>
+                  <input
+                    type="text"
+                    value={brokerCreds.appId}
+                    onChange={(e) => setBrokerCreds({ ...brokerCreds, appId: e.target.value.trim() })}
+                    placeholder="App ID from a3.aliceblueonline.com"
+                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-semibold text-[var(--text-primary)]">API Secret</label>
+                  <input
+                    type="password"
+                    value={brokerCreds.apiSecret}
+                    onChange={(e) => setBrokerCreds({ ...brokerCreds, apiSecret: e.target.value.trim() })}
+                    placeholder="Confidential API Secret Key"
+                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-semibold text-[var(--text-primary)]">Registered IPv4 Address</label>
+                    <button
+                      type="button"
+                      onClick={handleDetectIp}
+                      disabled={detectingIp}
+                      className="text-[10px] text-[var(--accent-indigo)] hover:underline flex items-center gap-1"
+                    >
+                      <RefreshCw size={10} className={detectingIp ? 'animate-spin' : ''} />
+                      {detectingIp ? 'Detecting...' : 'Detect Public IP'}
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={brokerCreds.ipAddress}
+                    onChange={(e) => setBrokerCreds({ ...brokerCreds, ipAddress: e.target.value.trim() })}
+                    placeholder="e.g. 103.21.244.10"
+                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                  />
+                  <p className="text-[10px] text-[var(--text-muted)]">
+                    Alice Blue requires your ISP static IPv4 address. Orders will not execute unless the IP is approved in the A3 portal.
+                  </p>
+                </div>
+              </div>
+
+              {/* Active Session & Actions */}
+              <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1">
+                    <Zap size={14} className="text-amber-400" />
+                    Daily Session Token
+                  </span>
+                  <span className="text-[10px] text-[var(--text-muted)] mt-0.5 block font-mono truncate max-w-sm">
+                    {brokerCreds.sessionToken || 'No active session token'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleGenerateToken}
+                    disabled={generatingToken}
+                    className="px-3 py-1.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-xs font-semibold hover:border-[var(--accent-indigo)] text-[var(--text-primary)] transition-all"
+                  >
+                    {generatingToken ? 'Generating...' : 'Generate Today\'s Session'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleSaveBrokerCreds}
+                    className="px-4 py-1.5 rounded bg-[var(--accent-indigo)] text-white text-xs font-bold hover:brightness-110 transition-all"
+                  >
+                    Save Broker Keys
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeSubTab === 'two-factor' && (
             <div className="space-y-4">
               <div className="pb-4 border-b border-[var(--border-subtle)]">

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Link } from 'react-router-dom'
 import {
   TrendingUp,
   TrendingDown,
@@ -7,6 +8,13 @@ import {
   FileText,
   BarChart3,
   Target,
+  Cpu,
+  ArrowUpRight,
+  Zap,
+  Server,
+  PenSquare,
+  Bell,
+  Users as UsersIcon,
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
@@ -19,6 +27,7 @@ import {
 } from '@/components/tradingview'
 import { useMarket } from '@/contexts/MarketContext'
 import { userService } from '@/services/userService'
+import { aliceBlueService } from '@/services/aliceBlueService'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -36,6 +45,8 @@ export default function Dashboard() {
   const [stats, setStats] = useState({ totalUsers: 0, proUsers: 0 })
   const [recentUsers, setRecentUsers] = useState<any[]>([])
   const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
+  const [brokerConnected, setBrokerConnected] = useState(false)
+  const [brokerConfigured, setBrokerConfigured] = useState(false)
 
   useEffect(() => {
     async function fetchStats() {
@@ -49,6 +60,16 @@ export default function Dashboard() {
       }
     }
     fetchStats()
+
+    const checkBroker = () => {
+      setBrokerConfigured(aliceBlueService.isConfigured())
+      setBrokerConnected(aliceBlueService.isConfigured() && aliceBlueService.isSessionActive())
+    }
+    checkBroker()
+
+    const onStatusChange = () => checkBroker()
+    window.addEventListener('aliceblue-status-change', onStatusChange)
+    return () => window.removeEventListener('aliceblue-status-change', onStatusChange)
   }, [])
 
   const subTabs = [
@@ -63,9 +84,93 @@ export default function Dashboard() {
     { id: 'website-visitors', label: 'Website Visitors' }
   ]
 
-
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-5">
+      {/* Top System Health & Broker Status Banner */}
+      <motion.div
+        variants={itemVariants}
+        className="p-4 rounded-xl border bg-gradient-to-r from-[var(--bg-secondary)] via-[var(--bg-secondary)] to-[var(--bg-tertiary)] border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-sm"
+      >
+        <div className="flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                brokerConnected
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : brokerConfigured
+                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  : 'bg-indigo-500/15 text-indigo-400 border border-indigo-500/30'
+              }`}
+            >
+              <Cpu size={18} />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-[var(--text-primary)]">Alice Blue ANT A3 Broker</span>
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    brokerConnected ? 'bg-emerald-400 animate-pulse' : brokerConfigured ? 'bg-amber-400' : 'bg-slate-400'
+                  }`}
+                />
+              </div>
+              <div className="text-[10px] text-[var(--text-muted)]">
+                {brokerConnected
+                  ? 'Connected & Streaming Live Indian Ticks'
+                  : brokerConfigured
+                  ? 'Credentials Configured (Generate Session Token)'
+                  : 'Setup Required: App ID & Secret Needed'}
+              </div>
+            </div>
+          </div>
+
+          <div className="h-6 w-[1px] bg-[var(--border-subtle)] hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <Server size={14} className="text-emerald-400" />
+            <div>
+              <span className="text-[10px] font-bold text-[var(--text-primary)] block">Cloud DB</span>
+              <span className="text-[9px] text-emerald-400 font-mono">Supabase Online</span>
+            </div>
+          </div>
+
+          <div className="h-6 w-[1px] bg-[var(--border-subtle)] hidden sm:block" />
+
+          <div className="flex items-center gap-2">
+            <Zap size={14} className="text-blue-400" />
+            <div>
+              <span className="text-[10px] font-bold text-[var(--text-primary)] block">Data Feeds</span>
+              <span className="text-[9px] text-blue-400 font-mono">Real-time / Smart Caching</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Admin Actions */}
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            to="/broker"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 transition-all shadow-sm"
+          >
+            <Cpu size={13} />
+            <span>Configure Alice Blue API</span>
+            <ArrowUpRight size={12} />
+          </Link>
+          <Link
+            to="/create"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--accent-indigo)] transition-all"
+          >
+            <PenSquare size={13} />
+            <span>Publish Analysis</span>
+          </Link>
+          <Link
+            to="/users"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--accent-indigo)] transition-all"
+          >
+            <UsersIcon size={13} />
+            <span>Users</span>
+          </Link>
+        </div>
+      </motion.div>
+
       {/* Horizontal Sub Tabs Bar */}
       <motion.div variants={itemVariants} className="flex flex-wrap items-center gap-1.5 p-1 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] w-fit">
         {subTabs.map((sub) => {
