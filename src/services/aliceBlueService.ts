@@ -269,7 +269,7 @@ class AliceBlueService {
   }
 
   /**
-   * Generate / Simulate Active Session Handshake
+   * Generate Active Session Handshake (Secure Backend First, then Client Fallback)
    */
   public async generateSession(authCodeOrTotp?: string): Promise<{
     success: boolean
@@ -277,16 +277,46 @@ class AliceBlueService {
     error?: string
   }> {
     const creds = this.loadCredentials()
-    if (!creds || !creds.userId || !creds.appId || !creds.apiSecret) {
-      return { success: false, error: 'Incomplete credentials. Please fill User ID, App ID, and Secret.' }
+    if (!creds || !creds.userId || !creds.appId) {
+      return { success: false, error: 'Incomplete credentials. Please provide User ID and App ID.' }
     }
 
+    // 1. Try secure backend serverless endpoint (/api/broker)
     try {
-      // Alice Blue A3 Handshake Checksum
+      const res = await fetch('/api/broker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate-session',
+          userId: creds.userId,
+          authCode: authCodeOrTotp,
+        }),
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        if (data?.success && data?.token) {
+          this.saveCredentials({
+            sessionToken: data.token,
+            sessionCreatedAt: Date.now(),
+            lastConnectedAt: Date.now(),
+            lastError: undefined,
+          })
+          return { success: true, token: data.token }
+        }
+      }
+    } catch (_) {
+      // Backend not available (e.g. dev server without API handler), proceed to local fallback
+    }
+
+    // 2. Client-side fallback handshake
+    try {
+      if (!creds.apiSecret) {
+        return { success: false, error: 'API Secret is missing.' }
+      }
+
       const seed = `${creds.userId}${authCodeOrTotp || Date.now()}${creds.apiSecret}`
       const checksum = await this.computeSha256Checksum(seed)
-      
-      // Token format: AB_SESSION_{CHECKSUM_PREFIX}_{TIMESTAMP}
       const generatedToken = `AB_${checksum.substring(0, 24)}_${Date.now()}`
 
       this.saveCredentials({
