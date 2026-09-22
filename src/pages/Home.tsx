@@ -1,12 +1,18 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   TrendingUp,
   TrendingDown,
   FileText,
   BarChart3,
   Target,
-  Lock
+  Lock,
+  Megaphone,
+  Radio,
+  Sparkles,
+  X,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
@@ -18,6 +24,7 @@ import {
 import { useMarket } from '@/contexts/MarketContext'
 import { analysisService } from '@/services/analysisService'
 import { useAuth } from '@/contexts/AuthContext'
+import { broadcastSyncService, type LiveMarketData, type FlashAlert } from '@/services/broadcastSyncService'
 import { Link } from 'react-router-dom'
 
 const containerVariants = {
@@ -32,16 +39,18 @@ const itemVariants = {
 
 export default function Home() {
   const { market } = useMarket()
-  const { profile } = useAuth()
+  const { profile, isSuperAdmin, isAdmin } = useAuth()
   const [analyses, setAnalyses] = useState<any[]>([])
   const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
+
+  // Real-Time Live Synced Market Data from Super Admin
+  const [liveData, setLiveData] = useState<LiveMarketData>(broadcastSyncService.getMarketData(market))
+  const [flashAlert, setFlashAlert] = useState<FlashAlert | null>(broadcastSyncService.getUrgentAlert())
+  const [justUpdated, setJustUpdated] = useState(false)
 
   useEffect(() => {
     async function loadAnalyses() {
       try {
-        // Note: For now we fetch 'free' and rely on RLS/filtering to limit PRO access later, 
-        // or we fetch all published and restrict in UI for demo purposes.
-        // If the user has a PRO subscription, they'd get PRO data via backend logic.
         const data = await analysisService.getPublishedAnalyses()
         setAnalyses(data || [])
       } catch (err) {
@@ -49,44 +58,131 @@ export default function Home() {
       }
     }
     loadAnalyses()
-  }, [])
 
-  const currentAnalysis = analyses.find(a => a.markets?.name === market)
+    // Sync with Broadcast Service in Real-Time
+    const initialData = broadcastSyncService.getMarketData(market)
+    setLiveData(initialData)
+    setFlashAlert(broadcastSyncService.getUrgentAlert())
 
-  const isPro = profile?.role === 'admin' || profile?.role === 'super_admin' // Real logic requires subscription checking
+    const unsubscribe = broadcastSyncService.subscribe(() => {
+      const updated = broadcastSyncService.getMarketData(market)
+      setLiveData(updated)
+      setFlashAlert(broadcastSyncService.getUrgentAlert())
+      setJustUpdated(true)
+      setTimeout(() => setJustUpdated(false), 3000)
+    })
+
+    return () => unsubscribe()
+  }, [market])
+
+  const currentAnalysis = analyses.find((a) => a.markets?.name === market)
+  const isPro = profile?.role === 'admin' || profile?.role === 'super_admin'
+
+  // Effective values prioritized by Super Admin Live Broadcast
+  const effectiveBias = liveData.bias || currentAnalysis?.overall_bias || 'neutral'
+  const effectiveSummary = liveData.summary || currentAnalysis?.summary || 'Market consolidation observed.'
+  const effectiveInvalidation = String(liveData.invalidationLevel || currentAnalysis?.invalidation_level || '-')
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-5">
-      <motion.div variants={itemVariants} className="flex justify-between items-center">
-        <h1 className="text-xl font-bold text-[var(--text-primary)]">Market Outlook</h1>
-        {!isPro && (
-          <Link to="/app/subscription" className="px-4 py-1.5 rounded bg-indigo-500/10 text-indigo-400 text-xs font-semibold hover:bg-indigo-500/20 transition-colors flex items-center gap-1.5">
-            <Lock size={12} /> Unlock Pro Features
-          </Link>
+      {/* Urgent Super Admin Flash Alert Banner */}
+      <AnimatePresence>
+        {flashAlert && flashAlert.active && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className={`p-3.5 rounded-xl border flex items-center justify-between gap-3 shadow-md ${
+              flashAlert.severity === 'alert'
+                ? 'bg-rose-500/15 border-rose-500/30 text-rose-300'
+                : flashAlert.severity === 'warning'
+                ? 'bg-amber-500/15 border-amber-500/30 text-amber-300'
+                : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300'
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-lg bg-rose-500/20 border border-rose-500/30 flex items-center justify-center flex-shrink-0">
+                <Megaphone size={16} className="text-rose-400 animate-bounce" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider bg-rose-500 text-white px-1.5 py-0.2 rounded">
+                    LIVE ADMIN ALERT
+                  </span>
+                  <span className="text-xs font-bold text-white">{flashAlert.title}</span>
+                </div>
+                <p className="text-xs text-[var(--text-secondary)] mt-0.5">{flashAlert.message}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setFlashAlert(null)}
+              className="p-1 rounded text-[var(--text-muted)] hover:text-white hover:bg-white/10 transition-colors"
+              title="Dismiss Alert"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
         )}
+      </AnimatePresence>
+
+      <motion.div variants={itemVariants} className="flex flex-wrap justify-between items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <h1 className="text-xl font-bold text-[var(--text-primary)]">Market Outlook ({market})</h1>
+          <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
+            <Radio size={10} className="animate-pulse" />
+            LIVE ADMIN SYNCED
+          </span>
+          {justUpdated && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500 text-white font-bold animate-pulse">
+              ⚡ UPDATED JUST NOW
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          {(isSuperAdmin || isAdmin) && (
+            <Link
+              to="/dashboard"
+              className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 text-xs font-bold border border-amber-500/30 hover:bg-amber-500/25 transition-colors flex items-center gap-1.5"
+            >
+              <ShieldCheck size={13} className="text-amber-400" />
+              <span>Back to Admin Console</span>
+            </Link>
+          )}
+          {!isPro && (
+            <Link
+              to="/app/subscription"
+              className="px-4 py-1.5 rounded bg-indigo-500/10 text-indigo-400 text-xs font-semibold hover:bg-indigo-500/20 transition-colors flex items-center gap-1.5"
+            >
+              <Lock size={12} /> Unlock Pro Features
+            </Link>
+          )}
+        </div>
       </motion.div>
 
       {/* Summary Stats */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard label="Market" value={market} sentiment="neutral" icon={<BarChart3 size={18} />} />
-        {currentAnalysis ? (
-          <>
-            <StatCard 
-              label="Overall Bias" 
-              value={currentAnalysis.overall_bias.toUpperCase()} 
-              sentiment={currentAnalysis.overall_bias} 
-              icon={currentAnalysis.overall_bias === 'bullish' ? <TrendingUp size={18} /> : <TrendingDown size={18} />} 
-            />
-            <StatCard label="Bias Statement" value={currentAnalysis.summary || 'Wait for breakout'} sentiment="neutral" icon={<Target size={18} />} />
-            <StatCard label="Invalid Below" value={currentAnalysis.invalidation_level?.toString() || '-'} sentiment="bearish" sublabel="Trend invalidation" icon={<TrendingDown size={18} />} />
-          </>
-        ) : (
-          <>
-            <StatCard label="Overall Bias" value="WAITING" sentiment="neutral" icon={<TrendingUp size={18} />} />
-            <StatCard label="Bias Statement" value="-" sentiment="neutral" icon={<Target size={18} />} />
-            <StatCard label="Invalid Below" value="-" sentiment="neutral" sublabel="Trend invalidation" icon={<TrendingDown size={18} />} />
-          </>
-        )}
+        <StatCard
+          label="Overall Bias"
+          value={effectiveBias.toUpperCase()}
+          sentiment={effectiveBias}
+          icon={effectiveBias === 'bullish' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+        />
+        <StatCard
+          label="Target / Resistance"
+          value={`${liveData.resistanceZone?.from || '-'} - ${liveData.resistanceZone?.to || '-'}`}
+          sentiment="bullish"
+          sublabel="Key breakout zone"
+          icon={<Target size={18} />}
+        />
+        <StatCard
+          label="Invalid Below"
+          value={effectiveInvalidation}
+          sentiment="bearish"
+          sublabel="Trend invalidation"
+          icon={<TrendingDown size={18} />}
+        />
       </motion.div>
 
       {/* Chart with Mode Toggle */}
@@ -152,31 +248,58 @@ export default function Home() {
             </div>
           ) : null}
           
-          {currentAnalysis ? (
-            <div className="space-y-4">
-               <div>
-                  <p className="text-xs leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
-                    {currentAnalysis.detailed_notes || 'No detailed notes provided for today.'}
-                  </p>
-               </div>
+          <div className="space-y-4">
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] uppercase font-bold text-[var(--accent-indigo)]">
+                  Live Admin Commentary ({market})
+                </span>
+                <span className="text-[9px] font-mono text-[var(--text-muted)]">
+                  Updated {new Date(liveData.lastUpdated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
+                {liveData.summary || currentAnalysis?.detailed_notes || 'Consolidation phase active. Watch defined key levels.'}
+              </p>
+              {liveData.notes && (
+                <p className="text-[11px] text-[var(--text-muted)] mt-2 italic">
+                  Note: {liveData.notes}
+                </p>
+              )}
             </div>
-          ) : (
-            <div className="text-sm text-[var(--text-muted)]">No analysis published for {market} yet.</div>
-          )}
+          </div>
         </div>
 
         {/* Support & Resistance Zones */}
         <div className="space-y-4">
           <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
-            <h4 className="text-xs font-semibold mb-3 text-[var(--text-primary)]">Key Trading Zones</h4>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs font-semibold text-[var(--text-primary)]">Key Trading Zones</h4>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+                ACTIVE
+              </span>
+            </div>
             
-            {currentAnalysis?.analysis_zones?.map((zone: any) => (
-              <div key={zone.id} className="flex justify-between items-center text-xs mb-3 pb-3 border-b border-[var(--border-subtle)] last:border-0 last:mb-0 last:pb-0">
-                <span className="text-[var(--text-muted)] capitalize">{zone.zone_type} Zone</span>
-                <span className="font-mono font-bold text-[var(--text-primary)]">{zone.price_from} – {zone.price_to}</span>
+            <div className="space-y-2.5">
+              <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
+                <span className="text-emerald-400 font-bold">Support Zone</span>
+                <span className="font-mono font-bold text-[var(--text-primary)]">
+                  {liveData.supportZone?.from || '-'} – {liveData.supportZone?.to || '-'}
+                </span>
               </div>
-            )) || <span className="text-xs text-[var(--text-muted)]">No zones defined.</span>}
-            
+              <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
+                <span className="text-rose-400 font-bold">Resistance Zone</span>
+                <span className="font-mono font-bold text-[var(--text-primary)]">
+                  {liveData.resistanceZone?.from || '-'} – {liveData.resistanceZone?.to || '-'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-amber-400 font-bold">Invalidation Level</span>
+                <span className="font-mono font-bold text-[var(--text-primary)]">
+                  {effectiveInvalidation}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
       </motion.div>

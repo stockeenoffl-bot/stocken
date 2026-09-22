@@ -16,6 +16,7 @@ import TradingViewChart from '@/components/charts/TradingViewChart'
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { analysisService } from '@/services/analysisService'
+import { broadcastSyncService } from '@/services/broadcastSyncService'
 import { toast } from 'sonner'
 
 const container = {
@@ -85,7 +86,19 @@ export default function Create() {
       ]
 
       await analysisService.createAnalysis(payload, zones)
-      toast.success(`Analysis ${status === 'draft' ? 'saved as draft' : 'published'} successfully!`)
+
+      // Broadcast immediately so all connected users see the updated bias, notes, and levels
+      const marketName = markets.find(m => m.id === selectedMarketId)?.name || 'NIFTY 50'
+      await broadcastSyncService.broadcastMarketUpdate(marketName, {
+        bias: bias.toLowerCase() as 'bullish' | 'bearish' | 'neutral',
+        summary: analysis.biasStatement || analysis.notes || '',
+        invalidationLevel: Number(analysis.invalidationLevel) || analysis.invalidationLevel,
+        supportZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
+        resistanceZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
+        notes: analysis.notes,
+      }, profile.full_name || 'Super Admin')
+
+      toast.success(`⚡ Analysis ${status === 'draft' ? 'saved as draft' : 'published'} & broadcasted to all users successfully!`)
     } catch (err: any) {
       toast.error(err.message || 'Failed to save analysis')
     } finally {

@@ -16,9 +16,11 @@ import {
   LineChart,
   TrendingUp,
   Cpu,
+  ShieldCheck,
 } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { aliceBlueService } from '@/services/aliceBlueService'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface NavItem {
   path: string
@@ -75,6 +77,8 @@ const clientNavItems: NavItem[] = [
 
 export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
   const location = useLocation()
+  const { isSuperAdmin, isAdmin } = useAuth()
+  const hasAdminAccess = isSuperAdmin || isAdmin
   const [brokerConnected, setBrokerConnected] = useState(false)
 
   useEffect(() => {
@@ -98,12 +102,21 @@ export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
         zIndex: 50,
       }}
     >
-      {/* Logo */}
+      {/* Logo & Super Admin Header */}
       <div className="flex items-center gap-3 px-5 h-16 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
         <img src="/images/ZonalEdge.jpeg" alt="Zonal Edge" className="w-8 h-8 rounded-lg object-cover" />
-        <div>
-          <div className="text-sm font-bold text-[var(--text-primary)]">Zonal Edge</div>
-          <div className="text-[8px] uppercase tracking-widest text-[var(--text-muted)]">Trade with Confidence</div>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold text-[var(--text-primary)] truncate">Zonal Edge</span>
+            {!isClient && (
+              <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                ADMIN
+              </span>
+            )}
+          </div>
+          <div className="text-[8px] uppercase tracking-widest text-[var(--text-muted)]">
+            {!isClient ? 'Super Admin Console' : 'Subscriber Portal'}
+          </div>
         </div>
       </div>
 
@@ -111,6 +124,16 @@ export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
       <nav className="flex-1 py-3 px-3 space-y-4 overflow-y-auto custom-scrollbar">
         {isClient ? (
           <div className="space-y-1">
+            {/* Quick Switcher back to Admin Console if Super Admin is previewing user view */}
+            {hasAdminAccess && (
+              <Link
+                to="/dashboard"
+                className="flex items-center gap-2 px-3 py-2 rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 text-xs font-bold hover:bg-amber-500/25 transition-all mb-3 shadow-sm"
+              >
+                <ShieldCheck size={16} className="text-amber-400" />
+                <span>Super Admin Console</span>
+              </Link>
+            )}
             {clientNavItems.map((item) => {
               const isActive = location.pathname === item.path
               return (

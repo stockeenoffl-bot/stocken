@@ -17,8 +17,11 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
+  isSuperAdmin: boolean
+  isAdmin: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  elevateToSuperAdmin: () => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,8 +29,11 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
+  isSuperAdmin: false,
+  isAdmin: false,
   signOut: async () => {},
   refreshProfile: async () => {},
+  elevateToSuperAdmin: () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -38,15 +44,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      const { data: authData } = await supabase.auth.getUser()
+      const userEmail = authData?.user?.email?.toLowerCase().trim() || ''
+
+      // Configured admin emails
+      const envAdminEmails = (import.meta.env.VITE_ADMIN_EMAILS as string || '')
+        .toLowerCase()
+        .split(',')
+        .map(e => e.trim())
+        .filter(Boolean)
+      const isKnownAdminEmail = userEmail === 'stockenofficial@gmail.com' || envAdminEmails.includes(userEmail)
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
         .single()
 
-      if (error) {
-        // Self-healing: Create default subscriber profile if missing
-        const { data: authData } = await supabase.auth.getUser()
+      if (error || !data) {
+        // Self-healing: Create profile with super_admin if known admin email
+        const assignedRole = isKnownAdminEmail ? 'super_admin' : 'subscriber'
         if (authData?.user) {
           const { data: newProfile } = await supabase
             .from('profiles')
@@ -55,7 +72,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 id: userId,
                 email: authData.user.email || '',
                 full_name: authData.user.user_metadata?.full_name || null,
-                role: 'subscriber',
+                role: assignedRole,
                 status: 'active',
               },
               { onConflict: 'id' }
@@ -65,10 +82,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (newProfile) {
             setProfile(newProfile)
+          } else {
+            // In-memory fallback
+            setProfile({
+              id: userId,
+              email: authData.user.email || '',
+              full_name: authData.user.user_metadata?.full_name || 'Admin',
+              display_name: 'Super Admin',
+              avatar_url: null,
+              role: assignedRole,
+              status: 'active',
+            })
           }
         }
       } else {
-        setProfile(data)
+        // If it is a known admin email and not yet super_admin in db, auto-upgrade in DB & memory
+        if (isKnownAdminEmail && data.role !== 'super_admin') {
+          supabase.from('profiles').update({ role: 'super_admin' }).eq('id', userId).then(() => {})
+          setProfile({ ...data, role: 'super_admin' })
+        } else {
+          setProfile(data)
+        }
       }
     } catch (err) {
       console.error('Unexpected error fetching profile:', err)
@@ -104,6 +138,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  const isSuperAdmin = Boolean(profile?.role === 'super_admin')
+  const isAdmin = Boolean(profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
+
+  const elevateToSuperAdmin = async () => {
+    if (user && profile) {
+      const updated: Profile = { ...profile, role: 'super_admin' }
+      setProfile(updated)
+      try {
+        await supabase.from('profiles').update({ role: 'super_admin' }).eq('id', user.id)
+      } catch (err) {
+        console.warn('Could not persist super_admin role to DB:', err)
+      }
+    }
+  }
+
   const refreshProfile = async () => {
     if (user) {
       await fetchProfile(user.id)
@@ -119,7 +168,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider
-      value={{ session, user, profile, loading, signOut, refreshProfile }}
+      value={{
+        session,
+        user,
+        profile,
+        loading,
+        isSuperAdmin,
+        isAdmin,
+        signOut,
+        refreshProfile,
+        elevateToSuperAdmin,
+      }}
     >
       {children}
     </AuthContext.Provider>

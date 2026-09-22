@@ -3,7 +3,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { Loader2 } from 'lucide-react'
 
 export function AdminRoute() {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, isSuperAdmin, isAdmin } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -18,7 +18,9 @@ export function AdminRoute() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (profile && !['super_admin', 'admin', 'analyst'].includes(profile.role)) {
+  const hasAdminAccess = isSuperAdmin || isAdmin || (profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
+
+  if (!hasAdminAccess) {
     // Subscriber trying to access admin dashboard
     return <Navigate to="/app" replace />
   }
@@ -46,7 +48,7 @@ export function ClientRoute() {
 }
 
 export function PublicRoute() {
-  const { session, profile, loading } = useAuth()
+  const { session, profile, loading, isSuperAdmin, isAdmin } = useAuth()
 
   if (loading) {
     return (
@@ -57,7 +59,8 @@ export function PublicRoute() {
   }
 
   if (session) {
-    if (profile && ['super_admin', 'admin', 'analyst'].includes(profile.role)) {
+    const hasAdminAccess = isSuperAdmin || isAdmin || (profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
+    if (hasAdminAccess) {
       return <Navigate to="/dashboard" replace />
     }
     return <Navigate to="/app" replace />

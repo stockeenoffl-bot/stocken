@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   TrendingUp,
   TrendingDown,
@@ -15,6 +15,14 @@ import {
   PenSquare,
   Bell,
   Users as UsersIcon,
+  Radio,
+  Megaphone,
+  Send,
+  Eye,
+  RefreshCw,
+  ShieldAlert,
+  Sparkles,
+  Check,
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
@@ -28,6 +36,8 @@ import {
 import { useMarket } from '@/contexts/MarketContext'
 import { userService } from '@/services/userService'
 import { aliceBlueService } from '@/services/aliceBlueService'
+import { broadcastSyncService, type LiveMarketData, type FlashAlert } from '@/services/broadcastSyncService'
+import { toast } from 'sonner'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -41,12 +51,95 @@ const itemVariants = {
 
 export default function Dashboard() {
   const { market } = useMarket()
+  const navigate = useNavigate()
   const [activeSubTab, setActiveSubTab] = useState('analysis')
   const [stats, setStats] = useState({ totalUsers: 0, proUsers: 0 })
   const [recentUsers, setRecentUsers] = useState<any[]>([])
   const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
   const [brokerConnected, setBrokerConnected] = useState(false)
   const [brokerConfigured, setBrokerConfigured] = useState(false)
+
+  // Real-Time Broadcaster State (Synced Live to All Normal Users)
+  const [liveData, setLiveData] = useState<LiveMarketData>(broadcastSyncService.getMarketData(market))
+  const [editBias, setEditBias] = useState<'bullish' | 'bearish' | 'neutral'>(liveData.bias)
+  const [editSummary, setEditSummary] = useState(liveData.summary)
+  const [editInvalidation, setEditInvalidation] = useState(String(liveData.invalidationLevel))
+  const [editSupportFrom, setEditSupportFrom] = useState(String(liveData.supportZone?.from || ''))
+  const [editSupportTo, setEditSupportTo] = useState(String(liveData.supportZone?.to || ''))
+  const [editResFrom, setEditResFrom] = useState(String(liveData.resistanceZone?.from || ''))
+  const [editResTo, setEditResTo] = useState(String(liveData.resistanceZone?.to || ''))
+  const [isBroadcasting, setIsBroadcasting] = useState(false)
+
+  // Urgent Flash Announcement State
+  const [alertTitle, setAlertTitle] = useState('')
+  const [alertMsg, setAlertMsg] = useState('')
+  const [alertSeverity, setAlertSeverity] = useState<'info' | 'warning' | 'alert' | 'success'>('alert')
+  const [currentAlert, setCurrentAlert] = useState<FlashAlert | null>(broadcastSyncService.getUrgentAlert())
+
+  useEffect(() => {
+    const data = broadcastSyncService.getMarketData(market)
+    setLiveData(data)
+    setEditBias(data.bias)
+    setEditSummary(data.summary)
+    setEditInvalidation(String(data.invalidationLevel))
+    setEditSupportFrom(String(data.supportZone?.from || ''))
+    setEditSupportTo(String(data.supportZone?.to || ''))
+    setEditResFrom(String(data.resistanceZone?.from || ''))
+    setEditResTo(String(data.resistanceZone?.to || ''))
+
+    const unsubscribe = broadcastSyncService.subscribe(() => {
+      const refreshed = broadcastSyncService.getMarketData(market)
+      setLiveData(refreshed)
+      setCurrentAlert(broadcastSyncService.getUrgentAlert())
+    })
+    return () => unsubscribe()
+  }, [market])
+
+  const handleBroadcast = async () => {
+    setIsBroadcasting(true)
+    try {
+      const updated = await broadcastSyncService.broadcastMarketUpdate(market, {
+        bias: editBias,
+        summary: editSummary,
+        invalidationLevel: Number(editInvalidation) || editInvalidation,
+        supportZone: {
+          from: Number(editSupportFrom) || liveData.supportZone.from,
+          to: Number(editSupportTo) || liveData.supportZone.to,
+        },
+        resistanceZone: {
+          from: Number(editResFrom) || liveData.resistanceZone.from,
+          to: Number(editResTo) || liveData.resistanceZone.to,
+        },
+      })
+      setLiveData(updated)
+      toast.success(`⚡ Live broadcast sent! All users' dashboards updated with live ${market} bias & levels.`)
+    } catch (err: any) {
+      toast.error('Failed to broadcast: ' + err.message)
+    } finally {
+      setIsBroadcasting(false)
+    }
+  }
+
+  const handlePostAlert = () => {
+    if (!alertTitle.trim() || !alertMsg.trim()) {
+      return toast.error('Please enter an alert title and message')
+    }
+    const created = broadcastSyncService.broadcastUrgentAlert({
+      title: alertTitle,
+      message: alertMsg,
+      severity: alertSeverity,
+    })
+    setCurrentAlert(created)
+    setAlertTitle('')
+    setAlertMsg('')
+    toast.success('Urgent Market Alert broadcasted to all users!')
+  }
+
+  const handleClearAlert = () => {
+    broadcastSyncService.clearUrgentAlert()
+    setCurrentAlert(null)
+    toast.info('Urgent Market Alert cleared.')
+  }
 
   useEffect(() => {
     async function fetchStats() {
@@ -202,12 +295,224 @@ export default function Dashboard() {
           {/* 1. INDEX ANALYSIS VIEW */}
           {activeSubTab === 'analysis' && (
             <div className="space-y-5">
-              {/* Summary Stats */}
+              {/* Real-Time Live Synced Summary Stats */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                 <StatCard label="Market" value={market} sentiment="neutral" icon={<BarChart3 size={18} />} />
-                <StatCard label="Overall Bias" value="BULLISH" sentiment="bullish" icon={<TrendingUp size={18} />} />
-                <StatCard label="Bias Above" value="24,220" sentiment="bullish" sublabel="Key breakout level" icon={<Target size={18} />} />
-                <StatCard label="Invalid Below" value="24,100" sentiment="bearish" sublabel="Trend invalidation" icon={<TrendingDown size={18} />} />
+                <StatCard
+                  label="Overall Bias"
+                  value={liveData.bias.toUpperCase()}
+                  sentiment={liveData.bias}
+                  icon={liveData.bias === 'bullish' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
+                />
+                <StatCard
+                  label="Target / Resistance"
+                  value={`${liveData.resistanceZone?.from || '-'} - ${liveData.resistanceZone?.to || '-'}`}
+                  sentiment="bullish"
+                  sublabel="Key target zone"
+                  icon={<Target size={18} />}
+                />
+                <StatCard
+                  label="Invalid Below"
+                  value={String(liveData.invalidationLevel)}
+                  sentiment="bearish"
+                  sublabel="Trend invalidation"
+                  icon={<TrendingDown size={18} />}
+                />
+              </div>
+
+              {/* SUPER ADMIN LIVE MARKET BROADCASTER WIDGET */}
+              <div className="p-5 rounded-xl border bg-gradient-to-br from-[var(--bg-secondary)] via-[var(--bg-secondary)] to-[var(--bg-tertiary)] border-indigo-500/30 shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[var(--border-subtle)]">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400">
+                      <Sparkles size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-[var(--text-primary)]">Super Admin Live Market Broadcaster</h3>
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse">
+                          Realtime Sync Active
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-muted)]">
+                        Any changes made here immediately update all subscribers' dashboards across all browsers and tabs in real-time.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => navigate('/app')}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--accent-indigo)] transition-all"
+                      title="Open Subscriber View to test live client experience"
+                    >
+                      <Eye size={13} className="text-indigo-400" />
+                      <span>Preview User View</span>
+                    </button>
+                    <button
+                      onClick={handleBroadcast}
+                      disabled={isBroadcasting}
+                      className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-600 text-white hover:brightness-110 shadow-sm transition-all disabled:opacity-50"
+                    >
+                      {isBroadcasting ? <RefreshCw size={13} className="animate-spin" /> : <Zap size={13} />}
+                      <span>Broadcast Live to Users</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Broadcaster Form Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {/* Bias Selector */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">
+                      1. Overall Bias ({market})
+                    </label>
+                    <div className="grid grid-cols-3 gap-1.5 p-1 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                      {(['bullish', 'bearish', 'neutral'] as const).map((b) => (
+                        <button
+                          key={b}
+                          type="button"
+                          onClick={() => setEditBias(b)}
+                          className={`py-1.5 px-2 rounded text-xs font-bold capitalize transition-all ${
+                            editBias === b
+                              ? b === 'bullish'
+                                ? 'bg-emerald-500 text-white shadow-sm'
+                                : b === 'bearish'
+                                ? 'bg-rose-500 text-white shadow-sm'
+                                : 'bg-indigo-500 text-white shadow-sm'
+                              : 'text-[var(--text-muted)] hover:text-white'
+                          }`}
+                        >
+                          {b}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Invalidation Level */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">
+                      2. Trend Invalidation Below
+                    </label>
+                    <input
+                      type="text"
+                      value={editInvalidation}
+                      onChange={(e) => setEditInvalidation(e.target.value)}
+                      placeholder="e.g. 24080"
+                      className="w-full px-3 py-2 text-xs font-mono rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)]"
+                    />
+                  </div>
+
+                  {/* Support Zone */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">
+                      3. Support Zone (Low - High)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editSupportFrom}
+                        onChange={(e) => setEditSupportFrom(e.target.value)}
+                        placeholder="From"
+                        className="w-1/2 px-2.5 py-2 text-xs font-mono rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)]"
+                      />
+                      <span className="text-xs text-[var(--text-muted)]">-</span>
+                      <input
+                        type="text"
+                        value={editSupportTo}
+                        onChange={(e) => setEditSupportTo(e.target.value)}
+                        placeholder="To"
+                        className="w-1/2 px-2.5 py-2 text-xs font-mono rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)]"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Resistance Zone */}
+                  <div>
+                    <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">
+                      4. Resistance Zone (Low - High)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={editResFrom}
+                        onChange={(e) => setEditResFrom(e.target.value)}
+                        placeholder="From"
+                        className="w-1/2 px-2.5 py-2 text-xs font-mono rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)]"
+                      />
+                      <span className="text-xs text-[var(--text-muted)]">-</span>
+                      <input
+                        type="text"
+                        value={editResTo}
+                        onChange={(e) => setEditResTo(e.target.value)}
+                        placeholder="To"
+                        className="w-1/2 px-2.5 py-2 text-xs font-mono rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)]"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bias Statement / Headline */}
+                <div>
+                  <label className="text-[11px] font-bold text-[var(--text-secondary)] mb-1.5 block uppercase tracking-wider">
+                    5. Real-Time Bias Statement & Market Commentary (Visible to Users)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={editSummary}
+                    onChange={(e) => setEditSummary(e.target.value)}
+                    placeholder="Enter market commentary, breakout conditions, and trade rationale..."
+                    className="w-full px-3 py-2 text-xs rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)] leading-relaxed"
+                  />
+                </div>
+
+                {/* Urgent Flash Alert Row */}
+                <div className="pt-3 border-t border-[var(--border-subtle)]/70 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex items-center gap-2 text-xs text-amber-400 font-semibold">
+                    <Megaphone size={14} />
+                    <span>Urgent Flash Banner:</span>
+                    {currentAlert ? (
+                      <span className="px-2 py-0.5 rounded bg-rose-500/20 text-rose-400 border border-rose-500/30 text-[10px] font-bold">
+                        ACTIVE: "{currentAlert.title}"
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-[var(--text-muted)]">None currently active</span>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="text"
+                      value={alertTitle}
+                      onChange={(e) => setAlertTitle(e.target.value)}
+                      placeholder="Alert title (e.g. NIFTY Breakout)"
+                      className="px-2.5 py-1.5 text-xs rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)] w-40"
+                    />
+                    <input
+                      type="text"
+                      value={alertMsg}
+                      onChange={(e) => setAlertMsg(e.target.value)}
+                      placeholder="Message (e.g. Crossed 24,200. Targets active.)"
+                      className="px-2.5 py-1.5 text-xs rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-indigo)] w-56"
+                    />
+                    <button
+                      type="button"
+                      onClick={handlePostAlert}
+                      className="px-3 py-1.5 rounded text-xs font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all"
+                    >
+                      Push Flash Banner
+                    </button>
+                    {currentAlert && (
+                      <button
+                        type="button"
+                        onClick={handleClearAlert}
+                        className="px-2 py-1.5 rounded text-xs font-medium text-[var(--text-muted)] hover:text-white transition-all"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Chart with Mode Toggle */}
@@ -255,35 +560,54 @@ export default function Dashboard() {
 
               {/* Analysis + Status */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {/* Today's Analysis */}
+                {/* Today's Live Broadcasted Analysis */}
                 <div
                   className="rounded-lg border p-4"
                   style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
                 >
-                  <div className="flex items-center gap-2 mb-4">
-                    <FileText size={16} style={{ color: 'var(--accent-indigo)' }} />
-                    <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Today's Analysis</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <FileText size={16} style={{ color: 'var(--accent-indigo)' }} />
+                      <h3 className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        Today's Analysis ({market})
+                      </h3>
+                    </div>
+                    <span className="text-[10px] font-mono text-[var(--text-muted)]">
+                      Updated {new Date(liveData.lastUpdated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} by {liveData.updatedBy || 'Super Admin'}
+                    </span>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <span className="text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>Bias</span>
-                      <p className="text-sm font-medium" style={{ color: 'var(--success)' }}>Bullish above 24,220</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>Invalidation</span>
-                      <p className="text-sm font-medium" style={{ color: 'var(--danger)' }}>Bearish below 24,100</p>
-                    </div>
-                    <div>
-                      <span className="text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>Market Expectation</span>
-                      <p className="text-xs leading-relaxed mt-1" style={{ color: 'var(--text-secondary)' }}>
-                        Expect bullish momentum if NIFTY sustains above 24,220. A move above 24,420 can push further upside. On downside, if 24,100 breaks, we may see sharp fall.
+                      <span className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Live Bias</span>
+                      <p
+                        className={`text-sm font-bold capitalize ${
+                          liveData.bias === 'bullish'
+                            ? 'text-emerald-400'
+                            : liveData.bias === 'bearish'
+                            ? 'text-rose-400'
+                            : 'text-indigo-400'
+                        }`}
+                      >
+                        {liveData.bias} (Invalidation: {liveData.invalidationLevel})
                       </p>
                     </div>
                     <div>
-                      <span className="text-[10px] uppercase" style={{ color: 'var(--text-muted)' }}>Key Levels to Watch</span>
+                      <span className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Market Expectation / Commentary</span>
+                      <p className="text-xs leading-relaxed mt-1" style={{ color: 'var(--text-secondary)' }}>
+                        {liveData.summary || 'Expect standard consolidation within defined range.'}
+                      </p>
+                    </div>
+                    <div>
+                      <span className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Key Levels to Watch</span>
                       <ul className="mt-1 space-y-1">
-                        <li className="text-xs" style={{ color: 'var(--text-secondary)' }}>24,220 – Immediate breakout level</li>
-                        <li className="text-xs" style={{ color: 'var(--text-secondary)' }}>24,100 – Trend invalidation level</li>
+                        <li className="text-xs flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
+                          <span>Support Zone:</span>
+                          <span className="font-mono font-bold text-emerald-400">{liveData.supportZone?.from} - {liveData.supportZone?.to}</span>
+                        </li>
+                        <li className="text-xs flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
+                          <span>Resistance Zone:</span>
+                          <span className="font-mono font-bold text-rose-400">{liveData.resistanceZone?.from} - {liveData.resistanceZone?.to}</span>
+                        </li>
                       </ul>
                     </div>
                   </div>
@@ -295,17 +619,23 @@ export default function Dashboard() {
                     className="rounded-lg border p-4"
                     style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
                   >
-                    <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Analysis Status</h4>
+                    <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Broadcasting Status</h4>
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle2 size={16} style={{ color: 'var(--success)' }} />
-                      <span className="text-sm font-medium" style={{ color: 'var(--success)' }}>Published</span>
+                      <span className="text-sm font-medium" style={{ color: 'var(--success)' }}>
+                        Live Synchronized across All Tabs
+                      </span>
                     </div>
-                    <p className="text-[10px] mb-3" style={{ color: 'var(--text-muted)' }}>Last updated 29 Apr 2025, 08:15 AM</p>
+                    <p className="text-[10px] mb-3" style={{ color: 'var(--text-muted)' }}>
+                      Subscribers currently viewing the client portal receive immediate updates via high-speed broadcast channel.
+                    </p>
                     <button
-                      className="w-full py-2 rounded-md text-xs font-medium transition-all duration-200 hover:brightness-110"
+                      onClick={() => navigate('/app')}
+                      className="w-full py-2 rounded-md text-xs font-bold transition-all duration-200 hover:brightness-110 flex items-center justify-center gap-1.5"
                       style={{ backgroundColor: 'var(--accent-indigo)', color: '#fff' }}
                     >
-                      View Live
+                      <Eye size={13} />
+                      <span>View Live Client Screen</span>
                     </button>
                   </div>
 

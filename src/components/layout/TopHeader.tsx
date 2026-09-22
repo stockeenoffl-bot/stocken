@@ -1,8 +1,8 @@
 import { useMarket } from '@/contexts/MarketContext'
 import { useAuth } from '@/contexts/AuthContext'
-import { Calendar, ChevronDown, LogOut, Bell, Cpu } from 'lucide-react'
+import { Calendar, ChevronDown, LogOut, Bell, Cpu, Eye, ShieldCheck, Sparkles } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { notificationService } from '@/services/notificationService'
 import type { AppNotification } from '@/services/notificationService'
 import { aliceBlueService } from '@/services/aliceBlueService'
@@ -10,14 +10,16 @@ import { toast } from 'sonner'
 
 export default function TopHeader() {
   const { market, setMarket } = useMarket()
-  const { profile, signOut } = useAuth()
+  const { profile, signOut, isSuperAdmin, isAdmin, elevateToSuperAdmin } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const today = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
   
+  const isClientView = location.pathname.startsWith('/app')
   const [notifications, setNotifications] = useState<AppNotification[]>([])
   const [showNotifications, setShowNotifications] = useState(false)
   const [brokerConnected, setBrokerConnected] = useState(false)
-  const isAdmin = profile && ['super_admin', 'admin', 'analyst'].includes(profile.role)
+  const hasAdminAccess = isSuperAdmin || isAdmin || (profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
 
   useEffect(() => {
     const updateBrokerStatus = () => {
@@ -89,10 +91,33 @@ export default function TopHeader() {
         <ChevronDown size={14} style={{ color: 'var(--text-muted)' }} />
       </div>
 
-      {/* Right - User */}
+      {/* Right - User & Admin Controls */}
       <div className="flex items-center gap-3">
+        {/* Super Admin View Switcher */}
+        {hasAdminAccess && (
+          isClientView ? (
+            <button
+              onClick={() => navigate('/dashboard')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-amber-500/15 text-amber-300 border border-amber-500/30 hover:bg-amber-500/25 transition-all shadow-sm"
+              title="Return to Master Super Admin Console"
+            >
+              <ShieldCheck size={14} className="text-amber-400" />
+              <span>Super Admin Console</span>
+            </button>
+          ) : (
+            <button
+              onClick={() => navigate('/app')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/25 transition-all shadow-sm"
+              title="Switch to Subscriber View to see what clients see"
+            >
+              <Eye size={13} className="text-indigo-400" />
+              <span>View as User</span>
+            </button>
+          )
+        )}
+
         {/* Alice Blue Broker Status Pill for Admins */}
-        {isAdmin && (
+        {hasAdminAccess && (
           <button
             onClick={() => navigate('/broker')}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-semibold transition-all border ${
@@ -158,19 +183,30 @@ export default function TopHeader() {
           )}
         </div>
 
-        <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-          Hi, {profile?.full_name || profile?.email?.split('@')[0] || 'User'}
-        </span>
-        <div
-          className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white overflow-hidden"
-          style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
-        >
-          {profile?.avatar_url ? (
-            <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
-          ) : (
-            (profile?.full_name?.[0] || profile?.email?.[0] || 'U').toUpperCase()
-          )}
+        {/* User Info & Role Badge */}
+        <div className="flex items-center gap-2">
+          <div className="text-right hidden sm:block">
+            <div className="text-xs font-medium text-[var(--text-primary)]">
+              {profile?.full_name || profile?.email?.split('@')[0] || 'User'}
+            </div>
+            {hasAdminAccess && (
+              <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                Super Admin
+              </span>
+            )}
+          </div>
+          <div
+            className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white overflow-hidden"
+            style={{ background: 'linear-gradient(135deg, #6366F1, #8B5CF6)' }}
+          >
+            {profile?.avatar_url ? (
+              <img src={profile.avatar_url} alt="Avatar" className="w-full h-full object-cover" />
+            ) : (
+              (profile?.full_name?.[0] || profile?.email?.[0] || 'U').toUpperCase()
+            )}
+          </div>
         </div>
+
         <button onClick={signOut} className="p-1.5 rounded-md transition-colors" style={{ color: 'var(--text-muted)' }} title="Sign Out">
           <LogOut size={18} />
         </button>
