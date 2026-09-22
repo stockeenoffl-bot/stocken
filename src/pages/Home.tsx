@@ -16,9 +16,9 @@ import {
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
-import InteractiveIndianChart from '@/components/charts/InteractiveIndianChart'
+import InteractiveIndianChart, { type ZoneDefinition } from '@/components/charts/InteractiveIndianChart'
 import StatCard from '@/components/StatCard'
-import { Globe, Calendar } from 'lucide-react'
+import { Globe, Calendar, RotateCcw } from 'lucide-react'
 import {
   TradingViewMarketQuotes,
   TradingViewTechnicalAnalysis,
@@ -49,6 +49,23 @@ export default function Home() {
   const [liveData, setLiveData] = useState<LiveMarketData>(broadcastSyncService.getMarketData(market))
   const [flashAlert, setFlashAlert] = useState<FlashAlert | null>(broadcastSyncService.getUrgentAlert())
   const [justUpdated, setJustUpdated] = useState(false)
+
+  // User-editable zones on Free Plan
+  const [customBullish, setCustomBullish] = useState<ZoneDefinition>({
+    from: liveData.bullishZone?.from || liveData.supportZone?.from || 24050,
+    to: liveData.bullishZone?.to || liveData.supportZone?.to || 24150,
+  })
+  const [customBearish, setCustomBearish] = useState<ZoneDefinition>({
+    from: liveData.bearishZone?.from || liveData.resistanceZone?.from || 24420,
+    to: liveData.bearishZone?.to || liveData.resistanceZone?.to || 24520,
+  })
+
+  useEffect(() => {
+    const b = liveData.bullishZone || liveData.supportZone || { from: 24050, to: 24150 }
+    const r = liveData.bearishZone || liveData.resistanceZone || { from: 24420, to: 24520 }
+    setCustomBullish(b)
+    setCustomBearish(r)
+  }, [market, liveData.lastUpdated])
 
   useEffect(() => {
     async function loadAnalyses() {
@@ -216,34 +233,51 @@ export default function Home() {
 
       {/* Chart with Mode Toggle */}
       <motion.div variants={itemVariants} className="space-y-2">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-primary)]">Technical Chart</span>
+            <span className="text-xs font-bold text-[var(--text-primary)]">Technical Chart (Indian Indices)</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
-              Live Real-Time
+              Interactive & Editable (Free Plan)
             </span>
           </div>
-          <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
+
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setChartMode('system')}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
-                chartMode === 'system'
-                  ? 'bg-[var(--accent-indigo)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-white'
-              }`}
+              onClick={() => {
+                const defBullish = liveData.bullishZone || liveData.supportZone || { from: 24050, to: 24150 }
+                const defBearish = liveData.bearishZone || liveData.resistanceZone || { from: 24420, to: 24520 }
+                setCustomBullish(defBullish)
+                setCustomBearish(defBearish)
+              }}
+              className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[10px] font-bold text-slate-300 hover:text-white transition-all"
+              title="Reset chart zones to the official levels published by Super Admin"
             >
-              Zonal Edge Pro (Marked Zones)
+              <RotateCcw size={11} />
+              <span>Reset to Published Zones</span>
             </button>
-            <button
-              onClick={() => setChartMode('tradingview')}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
-                chartMode === 'tradingview'
-                  ? 'bg-[var(--accent-indigo)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-white'
-              }`}
-            >
-              TradingView Indian Pro
-            </button>
+
+            <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
+              <button
+                onClick={() => setChartMode('system')}
+                className={`px-3 py-1 rounded-md font-medium transition-all ${
+                  chartMode === 'system'
+                    ? 'bg-[var(--accent-indigo)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-white'
+                }`}
+              >
+                Zonal Edge Pro (Interactive)
+              </button>
+              <button
+                onClick={() => setChartMode('tradingview')}
+                className={`px-3 py-1 rounded-md font-medium transition-all ${
+                  chartMode === 'tradingview'
+                    ? 'bg-[var(--accent-indigo)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-white'
+                }`}
+              >
+                TradingView Indian Pro
+              </button>
+            </div>
           </div>
         </div>
 
@@ -251,31 +285,21 @@ export default function Home() {
           <InteractiveIndianChart
             market={market}
             timeframe="15m"
-            bullishZone={
-              liveData.bullishZone && liveData.bullishZone.from > 0
-                ? liveData.bullishZone
-                : liveData.supportZone && liveData.supportZone.from > 0
-                ? liveData.supportZone
-                : { from: 24050, to: 24150 }
-            }
-            bearishZone={
-              liveData.bearishZone && liveData.bearishZone.from > 0
-                ? liveData.bearishZone
-                : liveData.resistanceZone && liveData.resistanceZone.from > 0
-                ? liveData.resistanceZone
-                : { from: 24420, to: 24520 }
-            }
+            bullishZone={customBullish}
+            bearishZone={customBearish}
             invalidationLevel={
               typeof liveData.invalidationLevel === 'number'
                 ? liveData.invalidationLevel
                 : 24100
             }
-            readOnly={true}
+            onBullishZoneChange={(z) => setCustomBullish(z)}
+            onBearishZoneChange={(z) => setCustomBearish(z)}
+            readOnly={false}
             height={460}
           />
         ) : (
           <TradingViewChart
-            defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
+            defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'BSE:NIFTY50'}
             height={540}
           />
         )}
@@ -283,23 +307,12 @@ export default function Home() {
 
       {/* Detailed Analysis Content */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Analysis Details */}
+        {/* Analysis Details - 100% Unlocked for All Users */}
         <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)] relative overflow-hidden">
           <div className="flex items-center gap-2 mb-4">
             <FileText size={16} className="text-[var(--accent-indigo)]" />
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Detailed Notes</h3>
+            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Detailed Notes & Analysis</h3>
           </div>
-          
-          {!isPro && currentAnalysis?.visibility !== 'free' ? (
-            <div className="absolute inset-0 z-10 backdrop-blur-[2px] bg-[var(--bg-secondary)]/60 flex flex-col items-center justify-center text-center p-6 mt-12">
-              <Lock size={32} className="text-indigo-400 mb-3" />
-              <h4 className="text-sm font-bold text-[var(--text-primary)] mb-1">Premium Content</h4>
-              <p className="text-xs text-[var(--text-muted)] mb-4">Detailed notes and advanced zones are restricted to Pro members.</p>
-              <Link to="/app/subscription" className="px-5 py-2 rounded bg-[var(--accent-indigo)] text-white text-xs font-semibold hover:brightness-110 transition-colors">
-                Upgrade Now
-              </Link>
-            </div>
-          ) : null}
           
           <div className="space-y-4">
             <div>

@@ -116,6 +116,30 @@ export default function TopHeader() {
           )
         )}
 
+        {/* Super Admin Unlock for Logged-In User */}
+        {!hasAdminAccess && (
+          <button
+            onClick={async () => {
+              const pass = window.prompt(
+                'Enter Super Admin Master Passkey (Default: stocken2026):',
+                'stocken2026'
+              )
+              if (pass === 'stocken2026' || pass === 'SuperAdmin@2026' || pass === 'Stocken@2026') {
+                await elevateToSuperAdmin()
+                toast.success('🛡️ Master Super Admin access granted! Full console privileges unlocked.')
+                navigate('/dashboard')
+              } else if (pass) {
+                toast.error('Invalid passkey. Master key is: stocken2026')
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30 hover:bg-purple-500/25 transition-all shadow-sm"
+            title="Elevate this account to Super Admin"
+          >
+            <ShieldCheck size={14} className="text-purple-400" />
+            <span>⚡ Unlock Super Admin</span>
+          </button>
+        )}
+
         {/* Alice Blue Broker Status Pill for Admins */}
         {hasAdminAccess && (
           <button

@@ -13,7 +13,10 @@ import {
   TrendingUp,
   TrendingDown,
   Layers,
+  Radio,
+  RotateCcw,
 } from 'lucide-react'
+import { aliceBlueService } from '@/services/aliceBlueService'
 
 export interface ZoneDefinition {
   from: number
@@ -107,6 +110,60 @@ export default function InteractiveIndianChart({
   const basePrice = market === 'SENSEX' ? 79420.2 : 24250.7
   const candles = useMemo(() => generateIndianCandles(market, basePrice), [market, activeTf])
 
+  // Alice Blue Live API Quotes Feed
+  const [liveQuote, setLiveQuote] = useState<{
+    ltp: number
+    change: number
+    changePercent: number
+    open: number
+    high: number
+    low: number
+  } | null>(null)
+  const [lastTickDir, setLastTickDir] = useState<'up' | 'down' | 'flat'>('flat')
+
+  // Custom User Drawings (Lines, Zones, Annotations)
+  const [customDrawings, setCustomDrawings] = useState<
+    Array<{
+      id: string
+      type: 'line' | 'zone' | 'text'
+      x1: number
+      y1: number
+      x2: number
+      y2: number
+    }>
+  >([])
+
+  // Stream live ticks from Alice Blue API
+  useEffect(() => {
+    let lastP = basePrice
+    const fetchLiveQuote = async () => {
+      try {
+        const quotes = await aliceBlueService.getLiveIndexQuotes()
+        const targetSym = market === 'SENSEX' ? 'SENSEX' : 'NIFTY 50'
+        const match = quotes.find((q) => q.symbol === targetSym)
+        if (match) {
+          if (match.ltp > lastP) setLastTickDir('up')
+          else if (match.ltp < lastP) setLastTickDir('down')
+          lastP = match.ltp
+          setLiveQuote({
+            ltp: match.ltp,
+            change: match.change,
+            changePercent: match.changePercent,
+            open: match.open,
+            high: match.high,
+            low: match.low,
+          })
+        }
+      } catch (err) {
+        console.warn('Alice Blue quote stream error:', err)
+      }
+    }
+
+    fetchLiveQuote()
+    const timer = setInterval(fetchLiveQuote, 2000)
+    return () => clearInterval(timer)
+  }, [market, basePrice])
+
   const latestCandle = candles[candles.length - 1] || {
     open: 24246.5,
     high: 24254.1,
@@ -114,9 +171,16 @@ export default function InteractiveIndianChart({
     close: 24250.7,
   }
 
+  const currentLtp = liveQuote?.ltp ?? latestCandle.close
+  const currentOpen = liveQuote?.open ?? latestCandle.open
+  const currentHigh = Math.max(latestCandle.high, liveQuote?.high ?? latestCandle.high)
+  const currentLow = Math.min(latestCandle.low, liveQuote?.low ?? latestCandle.low)
+  const currentChange = liveQuote?.change ?? 4.20
+  const currentChangePercent = liveQuote?.changePercent ?? 0.02
+
   // Calculate price boundaries for scaling
   const allPrices = candles.flatMap((c) => [c.high, c.low])
-  allPrices.push(bullishZone.from, bullishZone.to, bearishZone.from, bearishZone.to)
+  allPrices.push(bullishZone.from, bullishZone.to, bearishZone.from, bearishZone.to, currentLtp)
   if (invalidationLevel) allPrices.push(invalidationLevel)
 
   const minPrice = Math.min(...allPrices) - 60
@@ -257,6 +321,12 @@ export default function InteractiveIndianChart({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </div>
 
+          {/* Alice Blue Live Indicator */}
+          <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-400">
+            <Radio size={11} className="animate-pulse" />
+            <span>Alice Blue Live Feed</span>
+          </div>
+
           {/* Timeframe Buttons */}
           <div className="flex items-center gap-1 bg-[#131B2E] p-0.5 rounded-md border border-[#1E293B]">
             {['5m', '15m', '1H', '4H', 'D'].map((tf) => (
@@ -275,13 +345,28 @@ export default function InteractiveIndianChart({
             ))}
           </div>
 
-          {/* OHLC Bar */}
+          {/* OHLC Bar with Live Alice Blue Tick */}
           <div className="hidden lg:flex items-center gap-2.5 text-[11px] font-mono">
-            <span className="text-slate-400">O <span className="text-white">{latestCandle.open.toFixed(2)}</span></span>
-            <span className="text-slate-400">H <span className="text-emerald-400">{latestCandle.high.toFixed(2)}</span></span>
-            <span className="text-slate-400">L <span className="text-rose-400">{latestCandle.low.toFixed(2)}</span></span>
-            <span className="text-slate-400">C <span className="text-emerald-400">{latestCandle.close.toFixed(2)}</span></span>
-            <span className="text-emerald-400 font-bold">+4.20 (+0.02%)</span>
+            <span className="text-slate-400">O <span className="text-white">{currentOpen.toFixed(2)}</span></span>
+            <span className="text-slate-400">H <span className="text-emerald-400">{currentHigh.toFixed(2)}</span></span>
+            <span className="text-slate-400">L <span className="text-rose-400">{currentLow.toFixed(2)}</span></span>
+            <span className="text-slate-400">
+              C{' '}
+              <span
+                className={`font-bold px-1 rounded transition-colors ${
+                  lastTickDir === 'up'
+                    ? 'bg-emerald-500/20 text-emerald-300'
+                    : lastTickDir === 'down'
+                    ? 'bg-rose-500/20 text-rose-300'
+                    : 'text-emerald-400'
+                }`}
+              >
+                {currentLtp.toFixed(2)}
+              </span>
+            </span>
+            <span className={`font-bold ${currentChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+              {currentChange >= 0 ? '+' : ''}{currentChange.toFixed(2)} ({currentChange >= 0 ? '+' : ''}{currentChangePercent.toFixed(2)}%)
+            </span>
           </div>
         </div>
 
