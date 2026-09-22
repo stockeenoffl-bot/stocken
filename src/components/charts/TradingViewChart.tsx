@@ -35,12 +35,10 @@ interface PresetSymbol {
 }
 
 const PRESET_SYMBOLS: PresetSymbol[] = [
-  // Indian Indices
-  { label: 'NIFTY 50', symbol: 'NSE:NIFTY', desc: 'National Stock Exchange 50', category: 'indices' },
-  { label: 'BANK NIFTY', symbol: 'NSE:BANKNIFTY', desc: 'Banking Sector Index', category: 'indices' },
+  // Indian Indices (Using BSE/Global indices supported by TradingView free embed)
   { label: 'SENSEX', symbol: 'BSE:SENSEX', desc: 'Bombay Stock Exchange 30', category: 'indices' },
-  { label: 'FIN NIFTY', symbol: 'NSE:FINNIFTY', desc: 'Financial Services Index', category: 'indices' },
-  { label: 'MIDCPNIFTY', symbol: 'NSE:MIDCPNIFTY', desc: 'Midcap Select Index', category: 'indices' },
+  { label: 'NIFTY 50', symbol: 'BSE:NIFTY50', desc: 'National Stock Exchange 50 (BSE Feed)', category: 'indices' },
+  { label: 'BANKEX', symbol: 'BSE:BANKEX', desc: 'Banking Sector Index', category: 'indices' },
   { label: 'INDIA VIX', symbol: 'NSE:INDIAVIX', desc: 'India Volatility Index', category: 'indices' },
 
   // Indian Banking Heavyweights
@@ -60,7 +58,7 @@ const PRESET_SYMBOLS: PresetSymbol[] = [
 ]
 
 export default function TradingViewChart({
-  defaultSymbol = 'NSE:NIFTY',
+  defaultSymbol = 'BSE:SENSEX',
   height = 580,
   allowSymbolChange = true,
   showQuickBar = true,
@@ -125,9 +123,9 @@ export default function TradingViewChart({
         withdateranges: true,
         save_image: true, // Camera screenshot button
         hide_volume: false,
-        details: true,
-        hotlist: true,
-        calendar: true,
+        details: false, // Prevents foreign US stock sidebar (AAPL) from showing
+        hotlist: false,
+        calendar: false,
         studies: [
           'STD;SMA',
           'STD;RSI',

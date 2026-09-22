@@ -16,7 +16,9 @@ import {
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
 import TradingViewChart from '@/components/charts/TradingViewChart'
+import InteractiveIndianChart from '@/components/charts/InteractiveIndianChart'
 import StatCard from '@/components/StatCard'
+import { Globe, Calendar } from 'lucide-react'
 import {
   TradingViewMarketQuotes,
   TradingViewTechnicalAnalysis,
@@ -41,7 +43,7 @@ export default function Home() {
   const { market } = useMarket()
   const { profile, isSuperAdmin, isAdmin } = useAuth()
   const [analyses, setAnalyses] = useState<any[]>([])
-  const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
+  const [chartMode, setChartMode] = useState<'system' | 'tradingview'>('system')
 
   // Real-Time Live Synced Market Data from Super Admin
   const [liveData, setLiveData] = useState<LiveMarketData>(broadcastSyncService.getMarketData(market))
@@ -185,6 +187,33 @@ export default function Home() {
         />
       </motion.div>
 
+      {/* Verified Publication & Broadcast Info Banner */}
+      <motion.div
+        variants={itemVariants}
+        className="p-3.5 rounded-xl border border-indigo-500/30 bg-indigo-500/10 flex flex-wrap items-center justify-between gap-3 text-xs shadow-sm"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-indigo-600/30 border border-indigo-500/40 flex items-center justify-center flex-shrink-0">
+            <Radio size={16} className="text-indigo-400 animate-pulse" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-white text-xs">Official Analysis & Live Zones</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-bold border border-emerald-500/30">
+                ALICE BLUE LIVE FEED
+              </span>
+            </div>
+            <p className="text-slate-300 text-[11px] mt-0.5">
+              Published by <strong className="text-white">{liveData.updatedBy || 'Barath (Super Admin)'}</strong> &middot; Real-time zones displayed below
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
+          <Clock size={13} className="text-indigo-400" />
+          <span>Published: <strong className="text-indigo-200">{liveData.publishedAtFormatted || '22 Sept 2026, 20:55 IST'}</strong></span>
+        </div>
+      </motion.div>
+
       {/* Chart with Mode Toggle */}
       <motion.div variants={itemVariants} className="space-y-2">
         <div className="flex items-center justify-between">
@@ -196,16 +225,6 @@ export default function Home() {
           </div>
           <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
             <button
-              onClick={() => setChartMode('tradingview')}
-              className={`px-3 py-1 rounded-md font-medium transition-all ${
-                chartMode === 'tradingview'
-                  ? 'bg-[var(--accent-indigo)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-white'
-              }`}
-            >
-              TradingView Pro (Live + Draw)
-            </button>
-            <button
               onClick={() => setChartMode('system')}
               className={`px-3 py-1 rounded-md font-medium transition-all ${
                 chartMode === 'system'
@@ -213,18 +232,52 @@ export default function Home() {
                   : 'text-[var(--text-secondary)] hover:text-white'
               }`}
             >
-              Zonal Edge View
+              Zonal Edge Pro (Marked Zones)
+            </button>
+            <button
+              onClick={() => setChartMode('tradingview')}
+              className={`px-3 py-1 rounded-md font-medium transition-all ${
+                chartMode === 'tradingview'
+                  ? 'bg-[var(--accent-indigo)] text-white'
+                  : 'text-[var(--text-secondary)] hover:text-white'
+              }`}
+            >
+              TradingView Indian Pro
             </button>
           </div>
         </div>
 
-        {chartMode === 'tradingview' ? (
+        {chartMode === 'system' ? (
+          <InteractiveIndianChart
+            market={market}
+            timeframe="15m"
+            bullishZone={
+              liveData.bullishZone && liveData.bullishZone.from > 0
+                ? liveData.bullishZone
+                : liveData.supportZone && liveData.supportZone.from > 0
+                ? liveData.supportZone
+                : { from: 24050, to: 24150 }
+            }
+            bearishZone={
+              liveData.bearishZone && liveData.bearishZone.from > 0
+                ? liveData.bearishZone
+                : liveData.resistanceZone && liveData.resistanceZone.from > 0
+                ? liveData.resistanceZone
+                : { from: 24420, to: 24520 }
+            }
+            invalidationLevel={
+              typeof liveData.invalidationLevel === 'number'
+                ? liveData.invalidationLevel
+                : 24100
+            }
+            readOnly={true}
+            height={460}
+          />
+        ) : (
           <TradingViewChart
             defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
             height={540}
           />
-        ) : (
-          <CandlestickChart />
         )}
       </motion.div>
 
@@ -270,7 +323,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Support & Resistance Zones */}
+        {/* Support & Resistance Zones + Session Expectations */}
         <div className="space-y-4">
           <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
             <div className="flex items-center justify-between mb-3">
@@ -282,21 +335,75 @@ export default function Home() {
             
             <div className="space-y-2.5">
               <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
-                <span className="text-emerald-400 font-bold">Support Zone</span>
+                <span className="text-emerald-400 font-bold">Support / Bullish Zone</span>
                 <span className="font-mono font-bold text-[var(--text-primary)]">
-                  {liveData.supportZone?.from || '-'} – {liveData.supportZone?.to || '-'}
+                  {liveData.bullishZone?.from || liveData.supportZone?.from || '-'} – {liveData.bullishZone?.to || liveData.supportZone?.to || '-'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
-                <span className="text-rose-400 font-bold">Resistance Zone</span>
+                <span className="text-rose-400 font-bold">Resistance / Bearish Zone</span>
                 <span className="font-mono font-bold text-[var(--text-primary)]">
-                  {liveData.resistanceZone?.from || '-'} – {liveData.resistanceZone?.to || '-'}
+                  {liveData.bearishZone?.from || liveData.resistanceZone?.from || '-'} – {liveData.bearishZone?.to || liveData.resistanceZone?.to || '-'}
                 </span>
               </div>
               <div className="flex justify-between items-center text-xs">
                 <span className="text-amber-400 font-bold">Invalidation Level</span>
                 <span className="font-mono font-bold text-[var(--text-primary)]">
                   {effectiveInvalidation}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Published Session Expectations (Asian, London, New York) */}
+          <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-3">
+            <div className="flex items-center justify-between">
+              <h4 className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
+                <Globe size={14} className="text-indigo-400" />
+                <span>Session Expectations</span>
+              </h4>
+              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20">
+                GLOBAL SESSIONS
+              </span>
+            </div>
+
+            <div className="space-y-2 pt-1 text-xs">
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                <span className="text-slate-300 font-medium">Asian Session</span>
+                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+                  (liveData.sessions?.asian || 'Neutral') === 'Neutral'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : (liveData.sessions?.asian || 'Neutral') === 'Bullish'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                }`}>
+                  {liveData.sessions?.asian || 'Neutral'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                <span className="text-slate-300 font-medium">London Session</span>
+                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+                  (liveData.sessions?.london || 'Bullish') === 'Bullish'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : (liveData.sessions?.london || 'Bullish') === 'Bearish'
+                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                }`}>
+                  {liveData.sessions?.london || 'Bullish'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                <span className="text-slate-300 font-medium">New York Session</span>
+                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
+                  (liveData.sessions?.newYork || 'Volatile') === 'Volatile'
+                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
+                    : (liveData.sessions?.newYork || 'Volatile') === 'Bullish'
+                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
+                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
+                }`}>
+                  {liveData.sessions?.newYork || 'Volatile'}
                 </span>
               </div>
             </div>

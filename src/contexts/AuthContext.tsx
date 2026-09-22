@@ -19,6 +19,8 @@ interface AuthContextType {
   loading: boolean
   isSuperAdmin: boolean
   isAdmin: boolean
+  isSubscriber: boolean
+  hasAdminAccess: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   elevateToSuperAdmin: () => void
@@ -31,6 +33,8 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isSuperAdmin: false,
   isAdmin: false,
+  isSubscriber: true,
+  hasAdminAccess: false,
   signOut: async () => {},
   refreshProfile: async () => {},
   elevateToSuperAdmin: () => {},
@@ -62,8 +66,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (error || !data) {
-        // Self-healing: Create profile with super_admin if known admin email
+        // Self-healing: Create profile with super_admin if known admin email, otherwise subscriber
         const assignedRole = isKnownAdminEmail ? 'super_admin' : 'subscriber'
+        const userDisplayName = isKnownAdminEmail ? 'Super Admin' : 'Subscriber'
+        const userFullName = authData?.user?.user_metadata?.full_name || authData?.user?.email?.split('@')[0] || (isKnownAdminEmail ? 'Admin' : 'Subscriber')
+
         if (authData?.user) {
           const { data: newProfile } = await supabase
             .from('profiles')
@@ -71,7 +78,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               {
                 id: userId,
                 email: authData.user.email || '',
-                full_name: authData.user.user_metadata?.full_name || null,
+                full_name: userFullName,
+                display_name: userDisplayName,
                 role: assignedRole,
                 status: 'active',
               },
@@ -87,8 +95,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setProfile({
               id: userId,
               email: authData.user.email || '',
-              full_name: authData.user.user_metadata?.full_name || 'Admin',
-              display_name: 'Super Admin',
+              full_name: userFullName,
+              display_name: userDisplayName,
               avatar_url: null,
               role: assignedRole,
               status: 'active',
@@ -139,7 +147,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const isSuperAdmin = Boolean(profile?.role === 'super_admin')
-  const isAdmin = Boolean(profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
+  const isAdmin = Boolean(profile?.role === 'admin')
+  const hasAdminAccess = Boolean(profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
+  const isSubscriber = Boolean(!hasAdminAccess)
 
   const elevateToSuperAdmin = async () => {
     if (user && profile) {
@@ -175,6 +185,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isSuperAdmin,
         isAdmin,
+        isSubscriber,
+        hasAdminAccess,
         signOut,
         refreshProfile,
         elevateToSuperAdmin,

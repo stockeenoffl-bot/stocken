@@ -7,11 +7,21 @@ export interface LiveMarketData {
   invalidationLevel: number | string
   supportZone: { from: number; to: number }
   resistanceZone: { from: number; to: number }
+  bullishZone?: { from: number; to: number }
+  bearishZone?: { from: number; to: number }
+  biasStatement?: string
+  sessions?: {
+    asian: 'Bullish' | 'Bearish' | 'Neutral'
+    london: 'Bullish' | 'Bearish' | 'Neutral'
+    newYork: 'Bullish' | 'Bearish' | 'Volatile'
+  }
   target1?: number | string
   target2?: number | string
   notes?: string
   lastUpdated: number
+  publishedAtFormatted?: string
   updatedBy?: string
+  publishedByRole?: string
 }
 
 export interface FlashAlert {
@@ -32,15 +42,26 @@ const DEFAULT_MARKET_DATA: Record<string, LiveMarketData> = {
   'NIFTY 50': {
     market: 'NIFTY 50',
     bias: 'bullish',
-    summary: 'Consolidating above 24,150. Bullish momentum active with targets towards 24,350.',
-    invalidationLevel: 24080,
-    supportZone: { from: 24050, to: 24100 },
-    resistanceZone: { from: 24250, to: 24300 },
-    target1: 24280,
-    target2: 24350,
-    notes: 'Watch the 15-min open range. Buying on dips recommended near support zone.',
+    summary: 'Bullish above 24,220. Liquidity sweep below previous swing low followed by strong rejection.',
+    biasStatement: 'Bullish above 24,220',
+    invalidationLevel: 24100,
+    supportZone: { from: 24050, to: 24150 },
+    resistanceZone: { from: 24420, to: 24520 },
+    bullishZone: { from: 24050, to: 24150 },
+    bearishZone: { from: 24420, to: 24520 },
+    sessions: {
+      asian: 'Neutral',
+      london: 'Bullish',
+      newYork: 'Volatile',
+    },
+    target1: 24420,
+    target2: 24520,
+    notes:
+      'Liquidity sweep below previos swing low followed by strong rejection.\nExpect bullish momentum if 24,220 holds.\nWatch reaction near bearish zone for reversal signs.',
     lastUpdated: Date.now(),
-    updatedBy: 'Super Admin',
+    publishedAtFormatted: '22 Sept 2026, 20:55 IST',
+    updatedBy: 'Barath',
+    publishedByRole: 'Super Admin',
   },
   'SENSEX': {
     market: 'SENSEX',

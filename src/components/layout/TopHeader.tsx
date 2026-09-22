@@ -187,11 +187,19 @@ export default function TopHeader() {
         <div className="flex items-center gap-2">
           <div className="text-right hidden sm:block">
             <div className="text-xs font-medium text-[var(--text-primary)]">
-              {profile?.full_name || profile?.email?.split('@')[0] || 'User'}
+              {profile?.full_name || profile?.email?.split('@')[0] || 'Subscriber'}
             </div>
-            {hasAdminAccess && (
-              <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
+            {isSuperAdmin ? (
+              <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">
                 Super Admin
+              </span>
+            ) : isAdmin ? (
+              <span className="text-[9px] font-extrabold uppercase tracking-wider px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                Admin
+              </span>
+            ) : (
+              <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.2 rounded bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                Subscriber
               </span>
             )}
           </div>

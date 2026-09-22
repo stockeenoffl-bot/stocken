@@ -224,18 +224,49 @@ export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
         )}
       </nav>
 
-      {/* Pro Plan Card */}
-      <div className="mx-3 mb-2 p-3 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-subtle)]">
-        <div className="flex items-center gap-2 mb-1.5">
-          <Gem size={14} className="text-[var(--accent-indigo)]" />
-          <span className="text-xs font-bold text-[var(--text-primary)]">Admin Master Console</span>
+      {/* Subscriber Plan Card for Regular Users */}
+      {!hasAdminAccess && (
+        <div className="mx-3 mb-2 p-3 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-subtle)]">
+          <div className="flex items-center justify-between mb-1.5">
+            <span className="text-xs font-bold text-[var(--text-primary)]">Subscriber Portal</span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
+              ACTIVE
+            </span>
+          </div>
+          <div className="text-[10px] text-[var(--text-secondary)] mb-2">
+            Real-time Indian market signals & zones
+          </div>
+          <Link
+            to="/app/subscription"
+            className="w-full py-1.5 rounded bg-[var(--accent-indigo)] text-white text-[10px] font-bold text-center block hover:brightness-110 transition-all"
+          >
+            My Subscription
+          </Link>
         </div>
-        <div className="text-[10px] text-emerald-400 font-semibold mb-1 flex items-center gap-1">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          Super Admin Access
-        </div>
-        <div className="text-[9px] text-[var(--text-muted)]">Full broker execution privileges</div>
-      </div>
+      )}
+
+      {/* Admin Master Console - ONLY for Super Admin / Admin Accounts */}
+      {hasAdminAccess && (
+        <Link
+          to="/dashboard"
+          className="mx-3 mb-2 p-3 rounded-lg border bg-[var(--bg-tertiary)] border-[var(--border-subtle)] block hover:border-[var(--accent-indigo)] transition-all group"
+        >
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex items-center gap-1.5">
+              <Gem size={14} className="text-[var(--accent-indigo)]" />
+              <span className="text-xs font-bold text-[var(--text-primary)]">Admin Master Console</span>
+            </div>
+            <span className="text-[8px] font-extrabold uppercase px-1 py-0.2 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+              {isSuperAdmin ? 'SUPER ADMIN' : 'ADMIN'}
+            </span>
+          </div>
+          <div className="text-[10px] text-emerald-400 font-semibold mb-0.5 flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Switch to Admin &rarr;
+          </div>
+          <div className="text-[9px] text-[var(--text-muted)]">Full broker execution privileges</div>
+        </Link>
+      )}
 
       {/* Support */}
       <Link
