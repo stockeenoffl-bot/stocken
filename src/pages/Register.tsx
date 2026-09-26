@@ -80,7 +80,7 @@ export default function Register() {
               id: data.user.id,
               email: data.user.email,
               full_name: fullName,
-              role: 'subscriber',
+              role: 'user',
               status: 'active',
             },
             { onConflict: 'id' }

@@ -10,6 +10,9 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+-- Migration to ensure 'user' exists in older databases where this type was already created
+ALTER TYPE user_role ADD VALUE IF NOT EXISTS 'user';
+
 DO $$ BEGIN
     CREATE TYPE user_status AS ENUM ('active', 'inactive', 'suspended', 'banned', 'pending');
 EXCEPTION
