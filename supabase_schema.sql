@@ -5,7 +5,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Define Enums
 DO $$ BEGIN
-    CREATE TYPE user_role AS ENUM ('super_admin', 'admin', 'analyst', 'support', 'subscriber');
+    CREATE TYPE user_role AS ENUM ('admin', 'user');
 EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
     display_name TEXT,
     avatar_url TEXT,
     phone TEXT,
-    role user_role NOT NULL DEFAULT 'subscriber',
+    role user_role NOT NULL DEFAULT 'user',
     status user_status NOT NULL DEFAULT 'pending',
     country TEXT,
     timezone TEXT DEFAULT 'Asia/Kolkata',
@@ -281,7 +281,7 @@ CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
   INSERT INTO public.profiles (id, email, full_name, role, status)
-  VALUES (new.id, new.email, new.raw_user_meta_data->>'full_name', 'subscriber', 'active');
+  VALUES (new.id, new.email, new.raw_user_meta_data->>'full_name', 'user', 'active');
   RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -328,17 +328,7 @@ RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS (
     SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role IN ('super_admin', 'admin')
-  );
-END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
-
-CREATE OR REPLACE FUNCTION public.is_analyst()
-RETURNS BOOLEAN AS $$
-BEGIN
-  RETURN EXISTS (
-    SELECT 1 FROM public.profiles
-    WHERE id = auth.uid() AND role IN ('super_admin', 'admin', 'analyst')
+    WHERE id = auth.uid() AND role = 'admin'
   );
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
@@ -374,8 +364,8 @@ CREATE POLICY "Admins can view all payments" ON public.payments FOR SELECT USING
 -- Markets RLS
 DROP POLICY IF EXISTS "Anyone can view active markets" ON public.markets;
 CREATE POLICY "Anyone can view active markets" ON public.markets FOR SELECT USING (active = TRUE);
-DROP POLICY IF EXISTS "Analysts can manage markets" ON public.markets;
-CREATE POLICY "Analysts can manage markets" ON public.markets FOR ALL USING (public.is_analyst());
+DROP POLICY IF EXISTS "Admins can manage markets" ON public.markets;
+CREATE POLICY "Admins can manage markets" ON public.markets FOR ALL USING (public.is_admin());
 
 -- Analyses RLS
 -- Subquery is used here to avoid circular dependency, but logic is handled via app level entitlements mostly. 
@@ -383,24 +373,24 @@ CREATE POLICY "Analysts can manage markets" ON public.markets FOR ALL USING (pub
 DROP POLICY IF EXISTS "Anyone can view published free analyses" ON public.analyses;
 CREATE POLICY "Anyone can view published free analyses" ON public.analyses FOR SELECT USING (status = 'published' AND visibility = 'free');
 -- TODO: Add specific RLS for PRO/VIP visibility joining subscriptions (can cause performance issues, might be better handled in views/functions).
-DROP POLICY IF EXISTS "Analysts can manage analyses" ON public.analyses;
-CREATE POLICY "Analysts can manage analyses" ON public.analyses FOR ALL USING (public.is_analyst());
+DROP POLICY IF EXISTS "Admins can manage analyses" ON public.analyses;
+CREATE POLICY "Admins can manage analyses" ON public.analyses FOR ALL USING (public.is_admin());
 
 -- Analysis Zones RLS
 DROP POLICY IF EXISTS "Anyone can view zones for visible analyses" ON public.analysis_zones;
 CREATE POLICY "Anyone can view zones for visible analyses" ON public.analysis_zones FOR SELECT USING (TRUE); -- Relies on analyses table RLS
-DROP POLICY IF EXISTS "Analysts can manage zones" ON public.analysis_zones;
-CREATE POLICY "Analysts can manage zones" ON public.analysis_zones FOR ALL USING (public.is_analyst());
+DROP POLICY IF EXISTS "Admins can manage zones" ON public.analysis_zones;
+CREATE POLICY "Admins can manage zones" ON public.analysis_zones FOR ALL USING (public.is_admin());
 
 -- Learning RLS
 DROP POLICY IF EXISTS "Anyone can view published courses" ON public.courses;
 CREATE POLICY "Anyone can view published courses" ON public.courses FOR SELECT USING (published = TRUE);
-DROP POLICY IF EXISTS "Analysts can manage courses" ON public.courses;
-CREATE POLICY "Analysts can manage courses" ON public.courses FOR ALL USING (public.is_analyst());
+DROP POLICY IF EXISTS "Admins can manage courses" ON public.courses;
+CREATE POLICY "Admins can manage courses" ON public.courses FOR ALL USING (public.is_admin());
 DROP POLICY IF EXISTS "Anyone can view lessons" ON public.lessons;
 CREATE POLICY "Anyone can view lessons" ON public.lessons FOR SELECT USING (TRUE);
-DROP POLICY IF EXISTS "Analysts can manage lessons" ON public.lessons;
-CREATE POLICY "Analysts can manage lessons" ON public.lessons FOR ALL USING (public.is_analyst());
+DROP POLICY IF EXISTS "Admins can manage lessons" ON public.lessons;
+CREATE POLICY "Admins can manage lessons" ON public.lessons FOR ALL USING (public.is_admin());
 
 -- Progress RLS
 DROP POLICY IF EXISTS "Users can manage their own progress" ON public.lesson_progress;

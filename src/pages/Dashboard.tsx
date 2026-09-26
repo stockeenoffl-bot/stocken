@@ -76,6 +76,10 @@ export default function Dashboard() {
   const [alertSeverity, setAlertSeverity] = useState<'info' | 'warning' | 'alert' | 'success'>('alert')
   const [currentAlert, setCurrentAlert] = useState<FlashAlert | null>(broadcastSyncService.getUrgentAlert())
 
+  // TypeSafe AI (Jev) State
+  const [aiPrompt, setAiPrompt] = useState('')
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+
   useEffect(() => {
     const data = broadcastSyncService.getMarketData(market)
     setLiveData(data)
@@ -139,6 +143,34 @@ export default function Dashboard() {
     broadcastSyncService.clearUrgentAlert()
     setCurrentAlert(null)
     toast.info('Urgent Market Alert cleared.')
+  }
+
+  const handleAIAnalysis = async () => {
+    if (!aiPrompt.trim()) return toast.error('Please enter market news or feedback to analyze')
+    
+    setIsAnalyzing(true)
+    try {
+      // Simulating TypeSafe AI (Jev) System One Model integration
+      // "Code owns the workflow; the model supplies programmable common sense"
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+      
+      const lower = aiPrompt.toLowerCase()
+      let predictedBias: 'bullish' | 'bearish' | 'neutral' = 'neutral'
+      
+      if (lower.includes('good') || lower.includes('breakout') || lower.includes('up') || lower.includes('buy') || lower.includes('positive') || lower.includes('rally')) {
+        predictedBias = 'bullish'
+      } else if (lower.includes('bad') || lower.includes('crash') || lower.includes('down') || lower.includes('sell') || lower.includes('negative') || lower.includes('fall')) {
+        predictedBias = 'bearish'
+      }
+
+      setEditBias(predictedBias)
+      setEditSummary(`[AI Analysis] The recent news/feedback suggests a ${predictedBias} sentiment. Original text: "${aiPrompt.substring(0, 50)}..."`)
+      toast.success(`TypeSafe Jev AI successfully classified text as ${predictedBias.toUpperCase()}`)
+    } catch (err: any) {
+      toast.error('AI Analysis failed: ' + err.message)
+    } finally {
+      setIsAnalyzing(false)
+    }
   }
 
   useEffect(() => {
@@ -511,6 +543,34 @@ export default function Dashboard() {
                         Clear
                       </button>
                     )}
+                  </div>
+                </div>
+                
+                {/* TypeSafe AI Market News Classifier */}
+                <div className="pt-4 mt-4 border-t border-[var(--border-subtle)]">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+                    <div className="flex items-center gap-2 text-xs font-semibold text-purple-400">
+                      <Cpu size={14} />
+                      <span>TypeSafe System One (Jev AI) Auto-Analysis</span>
+                    </div>
+                    <span className="text-[10px] text-[var(--text-muted)]">Classify News/Feedback into Bias & Summary</span>
+                  </div>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={aiPrompt}
+                      onChange={(e) => setAiPrompt(e.target.value)}
+                      placeholder="Paste market news, RBI governor speech snippet, or global cues here..."
+                      className="flex-1 px-3 py-2 text-xs rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-primary)] focus:outline-none focus:border-purple-500"
+                    />
+                    <button
+                      onClick={handleAIAnalysis}
+                      disabled={isAnalyzing}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-purple-600/20 text-purple-400 border border-purple-500/40 hover:bg-purple-600/30 transition-all shadow-sm"
+                    >
+                      {isAnalyzing ? <RefreshCw size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                      <span>{isAnalyzing ? 'Analyzing...' : 'AI Classify Bias'}</span>
+                    </button>
                   </div>
                 </div>
               </div>

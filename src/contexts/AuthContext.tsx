@@ -8,7 +8,7 @@ export interface Profile {
   full_name: string | null
   display_name: string | null
   avatar_url: string | null
-  role: 'super_admin' | 'admin' | 'analyst' | 'support' | 'subscriber'
+  role: 'admin' | 'user'
   status: 'active' | 'inactive' | 'suspended' | 'banned' | 'pending'
 }
 
@@ -17,13 +17,12 @@ interface AuthContextType {
   user: User | null
   profile: Profile | null
   loading: boolean
-  isSuperAdmin: boolean
   isAdmin: boolean
-  isSubscriber: boolean
+  isUser: boolean
   hasAdminAccess: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
-  elevateToSuperAdmin: () => void
+  elevateToAdmin: () => void
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,13 +30,12 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   profile: null,
   loading: true,
-  isSuperAdmin: false,
   isAdmin: false,
-  isSubscriber: true,
+  isUser: true,
   hasAdminAccess: false,
   signOut: async () => {},
   refreshProfile: async () => {},
-  elevateToSuperAdmin: () => {},
+  elevateToAdmin: () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -66,10 +64,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (error || !data) {
-        // Self-healing: Create profile with super_admin if known admin email, otherwise subscriber
-        const assignedRole = isKnownAdminEmail ? 'super_admin' : 'subscriber'
-        const userDisplayName = isKnownAdminEmail ? 'Super Admin' : 'Subscriber'
-        const userFullName = authData?.user?.user_metadata?.full_name || authData?.user?.email?.split('@')[0] || (isKnownAdminEmail ? 'Admin' : 'Subscriber')
+        // Self-healing: Create profile with admin if known admin email, otherwise user
+        const assignedRole = isKnownAdminEmail ? 'admin' : 'user'
+        const userDisplayName = isKnownAdminEmail ? 'Admin' : 'User'
+        const userFullName = authData?.user?.user_metadata?.full_name || authData?.user?.email?.split('@')[0] || (isKnownAdminEmail ? 'Admin' : 'User')
 
         if (authData?.user) {
           const { data: newProfile } = await supabase
@@ -104,10 +102,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } else {
-        // If it is a known admin email and not yet super_admin in db, auto-upgrade in DB & memory
-        if (isKnownAdminEmail && data.role !== 'super_admin') {
-          supabase.from('profiles').update({ role: 'super_admin' }).eq('id', userId).then(() => {})
-          setProfile({ ...data, role: 'super_admin' })
+        // If it is a known admin email and not yet admin in db, auto-upgrade in DB & memory
+        if (isKnownAdminEmail && data.role !== 'admin') {
+          supabase.from('profiles').update({ role: 'admin' }).eq('id', userId).then(() => {})
+          setProfile({ ...data, role: 'admin' })
         } else {
           setProfile(data)
         }
@@ -146,19 +144,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const isSuperAdmin = Boolean(profile?.role === 'super_admin')
   const isAdmin = Boolean(profile?.role === 'admin')
-  const hasAdminAccess = Boolean(profile && ['super_admin', 'admin', 'analyst'].includes(profile.role))
-  const isSubscriber = Boolean(!hasAdminAccess)
+  const isUser = Boolean(profile?.role === 'user' || !profile)
+  const hasAdminAccess = isAdmin
 
-  const elevateToSuperAdmin = async () => {
+  const elevateToAdmin = async () => {
     if (user && profile) {
-      const updated: Profile = { ...profile, role: 'super_admin' }
+      const updated: Profile = { ...profile, role: 'admin' }
       setProfile(updated)
       try {
-        await supabase.from('profiles').update({ role: 'super_admin' }).eq('id', user.id)
+        await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id)
       } catch (err) {
-        console.warn('Could not persist super_admin role to DB:', err)
+        console.warn('Could not persist admin role to DB:', err)
       }
     }
   }
@@ -183,13 +180,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         profile,
         loading,
-        isSuperAdmin,
         isAdmin,
-        isSubscriber,
+        isUser,
         hasAdminAccess,
         signOut,
         refreshProfile,
-        elevateToSuperAdmin,
+        elevateToAdmin,
       }}
     >
       {children}

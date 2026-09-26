@@ -54,7 +54,7 @@ export default function Users() {
   const [newUser, setNewUser] = useState({
     fullName: '',
     email: '',
-    role: 'subscriber',
+    role: 'user',
     plan: 'Pro',
   })
 
@@ -73,7 +73,7 @@ export default function Users() {
           id: u.id,
           full_name: u.full_name || 'Trader',
           email: u.email,
-          role: u.role || 'subscriber',
+          role: u.role || 'user',
           status: u.status || 'active',
           created_at: new Date(u.created_at).toLocaleDateString('en-GB', {
             day: '2-digit',
@@ -146,7 +146,7 @@ export default function Users() {
       setUsers((prev) => [createdUserObj, ...prev])
       toast.success(`Member ${newUser.fullName} registered successfully!`)
       setShowAddModal(false)
-      setNewUser({ fullName: '', email: '', role: 'subscriber', plan: 'Pro' })
+      setNewUser({ fullName: '', email: '', role: 'user', plan: 'Pro' })
     } catch (err: any) {
       toast.error('Error creating user: ' + err.message)
     } finally {
@@ -284,10 +284,8 @@ export default function Users() {
                     className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                   >
                     <option value="all">All Roles</option>
-                    <option value="super_admin">Super Admin</option>
                     <option value="admin">Admin</option>
-                    <option value="analyst">Analyst</option>
-                    <option value="subscriber">Subscriber</option>
+                    <option value="user">User</option>
                   </select>
                 </div>
 
@@ -339,17 +337,13 @@ export default function Users() {
                               value={user.role}
                               onChange={(e) => changeUserRole(user.id, e.target.value)}
                               className={`px-2 py-0.5 rounded text-[10px] font-bold border outline-none bg-[var(--bg-secondary)] ${
-                                user.role === 'super_admin'
-                                  ? 'text-purple-400 border-purple-500/30'
-                                  : user.role === 'admin'
+                                user.role === 'admin'
                                   ? 'text-indigo-400 border-indigo-500/30'
                                   : 'text-slate-400 border-slate-500/30'
                               }`}
                             >
-                              <option value="super_admin">Super Admin</option>
                               <option value="admin">Admin</option>
-                              <option value="analyst">Analyst</option>
-                              <option value="subscriber">Subscriber</option>
+                              <option value="user">User</option>
                             </select>
                           </td>
                           <td className="p-3">
@@ -635,10 +629,8 @@ export default function Users() {
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                   >
-                    <option value="subscriber">Subscriber</option>
-                    <option value="analyst">Analyst</option>
+                    <option value="user">User</option>
                     <option value="admin">Admin</option>
-                    <option value="super_admin">Super Admin</option>
                   </select>
                 </div>
 

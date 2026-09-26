@@ -10,6 +10,8 @@ import {
   X,
   CheckCircle2,
 } from 'lucide-react'
+import { broadcastSyncService } from '@/services/broadcastSyncService'
+import { useAuth } from '@/contexts/AuthContext'
 
 declare global {
   interface Window {
@@ -68,12 +70,40 @@ export default function TradingViewChart({
   const containerId = `tv_chart_container_${containerUid}`
   const containerRef = useRef<HTMLDivElement>(null)
 
+  const { isAdmin } = useAuth()
+  
   const [activeCategory, setActiveCategory] = useState<SymbolCategory>('indices')
-  const [currentSymbol, setCurrentSymbol] = useState(defaultSymbol)
-  const [currentInterval, setCurrentInterval] = useState('15')
+  const [currentSymbol, setCurrentSymbol] = useState(() => {
+    return isAdmin ? defaultSymbol : broadcastSyncService.getChartConfig().symbol
+  })
+  const [currentInterval, setCurrentInterval] = useState(() => {
+    return isAdmin ? '15' : broadcastSyncService.getChartConfig().interval
+  })
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showGuide, setShowGuide] = useState(false)
   const [scriptLoaded, setScriptLoaded] = useState(false)
+
+  // Sync changes from admin
+  useEffect(() => {
+    const unsubscribe = broadcastSyncService.subscribe(() => {
+      if (!isAdmin) {
+        const config = broadcastSyncService.getChartConfig()
+        if (config.symbol !== currentSymbol) setCurrentSymbol(config.symbol)
+        if (config.interval !== currentInterval) setCurrentInterval(config.interval)
+      }
+    })
+    return () => unsubscribe()
+  }, [isAdmin, currentSymbol, currentInterval])
+
+  const handleSymbolChange = (symbol: string) => {
+    setCurrentSymbol(symbol)
+    if (isAdmin) broadcastSyncService.broadcastChartConfig({ symbol })
+  }
+
+  const handleIntervalChange = (interval: string) => {
+    setCurrentInterval(interval)
+    if (isAdmin) broadcastSyncService.broadcastChartConfig({ interval })
+  }
 
   // Load TradingView script once
   useEffect(() => {
@@ -182,7 +212,7 @@ export default function TradingViewChart({
                         (s) => s.symbol === currentSymbol
                       )
                     ) {
-                      setCurrentSymbol(firstInCat.symbol)
+                      handleSymbolChange(firstInCat.symbol)
                     }
                   }}
                   className={`px-2.5 py-1 rounded text-xs font-semibold transition-all ${
@@ -204,7 +234,7 @@ export default function TradingViewChart({
                 return (
                   <button
                     key={s.symbol}
-                    onClick={() => setCurrentSymbol(s.symbol)}
+                    onClick={() => handleSymbolChange(s.symbol)}
                     className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all ${
                       active
                         ? 'bg-[var(--accent-indigo)] text-white shadow-sm ring-1 ring-white/20'
@@ -231,7 +261,7 @@ export default function TradingViewChart({
               ].map((tf) => (
                 <button
                   key={tf.value}
-                  onClick={() => setCurrentInterval(tf.value)}
+                  onClick={() => handleIntervalChange(tf.value)}
                   className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
                     currentInterval === tf.value
                       ? 'bg-[var(--accent-indigo)] text-white'

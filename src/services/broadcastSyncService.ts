@@ -35,7 +35,20 @@ export interface FlashAlert {
 
 const STORAGE_KEY_MARKETS = 'zonal_edge_live_market_data_v2'
 const STORAGE_KEY_ALERT = 'zonal_edge_live_flash_alert_v2'
+const STORAGE_KEY_CHART = 'zonal_edge_chart_config'
 const CHANNEL_NAME = 'zonal_edge_broadcast_sync'
+
+export interface ChartConfig {
+  symbol: string
+  interval: string
+  updatedAt: number
+}
+
+const DEFAULT_CHART_CONFIG: ChartConfig = {
+  symbol: 'BSE:SENSEX',
+  interval: '15',
+  updatedAt: Date.now()
+}
 
 // Default baseline data for primary Indian markets
 const DEFAULT_MARKET_DATA: Record<string, LiveMarketData> = {
@@ -117,7 +130,11 @@ class BroadcastSyncService {
       try {
         this.channel = new BroadcastChannel(CHANNEL_NAME)
         this.channel.onmessage = (event) => {
-          if (event.data?.type === 'MARKET_DATA_UPDATED' || event.data?.type === 'FLASH_ALERT_UPDATED') {
+          if (
+            event.data?.type === 'MARKET_DATA_UPDATED' || 
+            event.data?.type === 'FLASH_ALERT_UPDATED' ||
+            event.data?.type === 'CHART_CONFIG_UPDATED'
+          ) {
             this.notifyListeners()
           }
         }
@@ -128,7 +145,7 @@ class BroadcastSyncService {
 
     if (typeof window !== 'undefined') {
       window.addEventListener('storage', (e) => {
-        if (e.key === STORAGE_KEY_MARKETS || e.key === STORAGE_KEY_ALERT) {
+        if (e.key === STORAGE_KEY_MARKETS || e.key === STORAGE_KEY_ALERT || e.key === STORAGE_KEY_CHART) {
           this.notifyListeners()
         }
       })
@@ -323,6 +340,42 @@ class BroadcastSyncService {
       }
     } catch (e) {}
     return null
+  }
+
+  /**
+   * Get the current active chart config
+   */
+  public getChartConfig(): ChartConfig {
+    try {
+      const stored = localStorage.getItem(STORAGE_KEY_CHART)
+      if (stored) {
+        return JSON.parse(stored)
+      }
+    } catch (e) {}
+    return DEFAULT_CHART_CONFIG
+  }
+
+  /**
+   * Super Admin Method: Broadcast chart symbol and timeframe change
+   */
+  public broadcastChartConfig(config: Partial<ChartConfig>): ChartConfig {
+    const current = this.getChartConfig()
+    const updated = {
+      ...current,
+      ...config,
+      updatedAt: Date.now()
+    }
+
+    try {
+      localStorage.setItem(STORAGE_KEY_CHART, JSON.stringify(updated))
+    } catch (e) {}
+
+    if (this.channel) {
+      this.channel.postMessage({ type: 'CHART_CONFIG_UPDATED', config: updated })
+    }
+    this.notifyListeners()
+    
+    return updated
   }
 }
 
