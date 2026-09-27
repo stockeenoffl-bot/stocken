@@ -15,9 +15,9 @@ import {
   TradingViewTechnicalAnalysis,
   TradingViewStockHeatmap,
   TradingViewIndianScreener,
-  TradingViewMiniChart,
 } from '@/components/tradingview'
 import TradingViewChart from '@/components/charts/TradingViewChart'
+import AliceBlueMiniChart from '@/components/charts/AliceBlueMiniChart'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -154,25 +154,25 @@ export default function IndianMarkets() {
         variants={itemVariants}
         className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"
       >
-        <TradingViewMiniChart
+        <AliceBlueMiniChart
           symbol="NSE:NIFTY"
           title="NIFTY 50"
-          height={170}
+          height={140}
         />
-        <TradingViewMiniChart
+        <AliceBlueMiniChart
           symbol="NSE:BANKNIFTY"
           title="BANK NIFTY"
-          height={170}
+          height={140}
         />
-        <TradingViewMiniChart
+        <AliceBlueMiniChart
           symbol="BSE:SENSEX"
           title="BSE SENSEX"
-          height={170}
+          height={140}
         />
-        <TradingViewMiniChart
+        <AliceBlueMiniChart
           symbol="NSE:FINNIFTY"
           title="FIN NIFTY"
-          height={170}
+          height={140}
         />
       </motion.div>
 
