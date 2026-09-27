@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS public.analyses (
     visibility visibility_level NOT NULL DEFAULT 'free',
     author_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE RESTRICT,
     published_at TIMESTAMPTZ,
+    custom_drawings JSONB DEFAULT '[]'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

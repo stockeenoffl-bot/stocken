@@ -11,6 +11,7 @@ export interface AnalysisPayload {
   status: 'draft' | 'scheduled' | 'published' | 'archived'
   visibility: 'free' | 'pro' | 'vip'
   author_id: string
+  custom_drawings?: any
 }
 
 export interface ZonePayload {

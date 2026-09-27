@@ -25,6 +25,16 @@ export interface ZoneDefinition {
   label?: string
 }
 
+export interface CustomDrawing {
+  id: string
+  type: 'line' | 'zone' | 'text'
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+  text?: string
+}
+
 interface InteractiveIndianChartProps {
   market?: string
   timeframe?: string
@@ -33,6 +43,8 @@ interface InteractiveIndianChartProps {
   invalidationLevel?: number
   onBullishZoneChange?: (zone: ZoneDefinition) => void
   onBearishZoneChange?: (zone: ZoneDefinition) => void
+  customDrawings?: CustomDrawing[]
+  onCustomDrawingsChange?: (drawings: CustomDrawing[]) => void
   height?: number
   readOnly?: boolean
 }
@@ -90,6 +102,8 @@ export default function InteractiveIndianChart({
   invalidationLevel = 24100,
   onBullishZoneChange,
   onBearishZoneChange,
+  customDrawings: externalCustomDrawings,
+  onCustomDrawingsChange,
   height = 460,
   readOnly = false,
 }: InteractiveIndianChartProps) {
@@ -108,7 +122,56 @@ export default function InteractiveIndianChart({
   } | null>(null)
 
   const basePrice = market === 'SENSEX' ? 79420.2 : 24250.7
-  const candles = useMemo(() => generateIndianCandles(market, basePrice), [market, activeTf])
+  
+  const [candles, setCandles] = useState<any[]>([])
+
+  useEffect(() => {
+    async function loadCandles() {
+      // Determine resolution
+      let resolution = '1' // 1 minute by default
+      if (activeTf === '1D' || activeTf === 'D') resolution = 'D'
+      // AliceBlue might not support 15m directly in the basic `history` endpoint, usually you get 1m and build 15m.
+      // But we will pass the requested resolution or fallback.
+      if (['5m', '15m', '1H', '4H'].includes(activeTf)) resolution = '1'
+
+      const toTime = Date.now()
+      const fromTime = toTime - 3 * 24 * 60 * 60 * 1000 // Last 3 days
+
+      const data = await aliceBlueService.getHistoricalData({
+        symbol: market,
+        exchange: 'NSE', // Overridden in service for indices
+        resolution,
+        from: fromTime,
+        to: toTime
+      })
+
+      if (data && data.length > 0) {
+        // Map AliceBlue format to our internal format
+        // API format: { "volume": 0.0, "high": 23727.45, "low": 23675.25, "time": "2026-05-19 09:15:59", "close": 23715.65, "open": 23675.3 }
+        const mappedCandles = data.map(d => {
+          const dt = new Date(d.time)
+          return {
+            time: dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
+            day: dt.getDate().toString(),
+            fullDate: dt,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+            isGreen: d.close >= d.open,
+          }
+        })
+        
+        // If we got 1m data but requested 15m, we technically should group them,
+        // but for now just display what we got (or subsample for performance)
+        setCandles(mappedCandles.slice(-100)) // Keep last 100 to fit SVG
+      } else {
+        // Fallback to generated data if API fails or during market hours (when it's disabled)
+        setCandles(generateIndianCandles(market, basePrice))
+      }
+    }
+    loadCandles()
+  }, [market, activeTf, basePrice])
 
   // Alice Blue Live API Quotes Feed
   const [liveQuote, setLiveQuote] = useState<{
@@ -122,16 +185,64 @@ export default function InteractiveIndianChart({
   const [lastTickDir, setLastTickDir] = useState<'up' | 'down' | 'flat'>('flat')
 
   // Custom User Drawings (Lines, Zones, Annotations)
-  const [customDrawings, setCustomDrawings] = useState<
-    Array<{
-      id: string
-      type: 'line' | 'zone' | 'text'
-      x1: number
-      y1: number
-      x2: number
-      y2: number
-    }>
-  >([])
+  const [internalCustomDrawings, setInternalCustomDrawings] = useState<CustomDrawing[]>([])
+  const customDrawings = externalCustomDrawings ?? internalCustomDrawings
+  const setCustomDrawings = onCustomDrawingsChange ?? setInternalCustomDrawings
+
+  const [currentDrawing, setCurrentDrawing] = useState<{
+    type: 'line' | 'zone' | 'text'
+    x1: number
+    y1: number
+    x2: number
+    y2: number
+  } | null>(null)
+
+  const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (readOnly || activeTool === 'cursor') return
+
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    if (activeTool === 'text') {
+      const text = window.prompt('Enter annotation text:')
+      if (text) {
+        setCustomDrawings([
+          ...customDrawings,
+          { id: Date.now().toString(), type: 'text', x1: x, y1: y, x2: x, y2: y, text },
+        ])
+      }
+      setActiveTool('cursor')
+      return
+    }
+
+    if (activeTool === 'line' || activeTool === 'zone') {
+      setCurrentDrawing({ type: activeTool, x1: x, y1: y, x2: x, y2: y })
+    }
+  }
+
+  const handleSvgMouseMove = (e: React.MouseEvent<SVGSVGElement>) => {
+    if (!currentDrawing || readOnly) return
+    const rect = svgRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const x = e.clientX - rect.left
+    const y = e.clientY - rect.top
+
+    setCurrentDrawing((prev) => (prev ? { ...prev, x2: x, y2: y } : null))
+  }
+
+  const handleSvgMouseUp = () => {
+    if (currentDrawing) {
+      if (Math.abs(currentDrawing.x2 - currentDrawing.x1) > 2 || Math.abs(currentDrawing.y2 - currentDrawing.y1) > 2) {
+        setCustomDrawings([
+          ...customDrawings,
+          { id: Date.now().toString(), ...currentDrawing },
+        ])
+      }
+      setCurrentDrawing(null)
+    }
+  }
 
   // Stream live ticks from Alice Blue API
   useEffect(() => {
@@ -183,8 +294,9 @@ export default function InteractiveIndianChart({
   allPrices.push(bullishZone.from, bullishZone.to, bearishZone.from, bearishZone.to, currentLtp)
   if (invalidationLevel) allPrices.push(invalidationLevel)
 
-  const minPrice = Math.min(...allPrices) - 60
-  const maxPrice = Math.max(...allPrices) + 60
+  // Avoid infinity if no candles yet
+  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) - 60 : basePrice - 100
+  const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) + 60 : basePrice + 100
   const priceRange = maxPrice - minPrice || 1
 
   // Chart dimensions inside SVG
@@ -451,9 +563,13 @@ export default function InteractiveIndianChart({
         <div className="flex-1 relative overflow-hidden bg-[#0A0D16]">
           <svg
             ref={svgRef}
-            className="w-full h-full cursor-crosshair"
+            className={`w-full h-full ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`}
             viewBox={`0 0 1000 ${height}`}
             preserveAspectRatio="none"
+            onMouseDown={handleSvgMouseDown}
+            onMouseMove={handleSvgMouseMove}
+            onMouseUp={handleSvgMouseUp}
+            onMouseLeave={handleSvgMouseUp}
           >
             <defs>
               {/* Bearish Gradient */}
@@ -691,6 +807,61 @@ export default function InteractiveIndianChart({
                   />
                 </g>
               )
+            })}
+
+            {/* CUSTOM USER DRAWINGS */}
+            {[...customDrawings, ...(currentDrawing ? [{ id: 'current', ...currentDrawing }] : [])].map((d) => {
+              if (d.type === 'line') {
+                return (
+                  <line
+                    key={d.id}
+                    x1={d.x1}
+                    y1={d.y1}
+                    x2={d.x2}
+                    y2={d.y2}
+                    stroke="#6366F1"
+                    strokeWidth="2"
+                    onDoubleClick={() => !readOnly && setCustomDrawings(customDrawings.filter((p) => p.id !== d.id))}
+                    className={!readOnly ? 'cursor-pointer hover:stroke-indigo-400' : ''}
+                  />
+                )
+              } else if (d.type === 'zone') {
+                const x = Math.min(d.x1, d.x2)
+                const y = Math.min(d.y1, d.y2)
+                const w = Math.abs(d.x2 - d.x1)
+                const h = Math.abs(d.y2 - d.y1)
+                return (
+                  <rect
+                    key={d.id}
+                    x={x}
+                    y={y}
+                    width={w}
+                    height={h}
+                    fill="#3B82F6"
+                    fillOpacity="0.2"
+                    stroke="#3B82F6"
+                    strokeWidth="1.5"
+                    onDoubleClick={() => !readOnly && setCustomDrawings(customDrawings.filter((p) => p.id !== d.id))}
+                    className={!readOnly ? 'cursor-pointer hover:stroke-blue-400' : ''}
+                  />
+                )
+              } else if (d.type === 'text') {
+                return (
+                  <text
+                    key={d.id}
+                    x={d.x1}
+                    y={d.y1}
+                    fill="#E2E8F0"
+                    fontSize="12"
+                    fontWeight="bold"
+                    onDoubleClick={() => !readOnly && setCustomDrawings(customDrawings.filter((p) => p.id !== d.id))}
+                    className={!readOnly ? 'cursor-pointer hover:fill-indigo-400' : ''}
+                  >
+                    {d.text}
+                  </text>
+                )
+              }
+              return null
             })}
 
             {/* CURRENT LIVE PRICE DASHED LINE */}

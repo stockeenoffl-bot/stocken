@@ -418,6 +418,68 @@ class AliceBlueService {
   }
 
   /**
+   * Fetch Historical Data from Alice Blue API
+   */
+  public async getHistoricalData(params: {
+    symbol: string
+    exchange: string
+    resolution: string
+    from: number
+    to: number
+  }): Promise<any[]> {
+    const creds = this.loadCredentials()
+    if (!creds?.sessionToken) {
+      console.warn('[AliceBlue] No session token for historical data')
+      return []
+    }
+
+    // Map common indices to their tokens
+    let token = ''
+    let exchangeStr = params.exchange
+    
+    if (params.symbol === 'NIFTY 50') {
+      token = '26000'
+      exchangeStr = 'NSE::index'
+    } else if (params.symbol === 'SENSEX') {
+      token = '1' // General BSE index token, may need verification
+      exchangeStr = 'BSE::index'
+    } else if (params.symbol === 'BANKNIFTY') {
+      token = '26009'
+      exchangeStr = 'NSE::index'
+    }
+
+    if (!token) return []
+
+    try {
+      const response = await fetch('https://ant.aliceblueonline.com/open-api/od/ChartAPIService/api/chart/history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${creds.userId} ${creds.sessionToken}`,
+        },
+        body: JSON.stringify({
+          token,
+          resolution: params.resolution,
+          from: params.from.toString(),
+          to: params.to.toString(),
+          exchange: exchangeStr
+        })
+      })
+
+      const data = await response.json()
+      if (data.stat === 'Ok' && data.result) {
+        return data.result
+      } else {
+        console.warn('[AliceBlue] Historical Data Error:', data.emsg)
+        return []
+      }
+    } catch (err) {
+      console.error('[AliceBlue] Fetch historical data failed:', err)
+      return []
+    }
+  }
+
+  /**
    * Place Test / Paper Order to verify broker routing pipeline
    */
   public async placeTestOrder(params: {

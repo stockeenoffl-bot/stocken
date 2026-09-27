@@ -17,7 +17,7 @@ import {
   ChevronDown,
   Zap,
 } from 'lucide-react'
-import InteractiveIndianChart, { type ZoneDefinition } from '@/components/charts/InteractiveIndianChart'
+import InteractiveIndianChart, { type ZoneDefinition, type CustomDrawing } from '@/components/charts/InteractiveIndianChart'
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { analysisService } from '@/services/analysisService'
@@ -44,6 +44,7 @@ export default function Create() {
   const [analysisDate, setAnalysisDate] = useState('29 Apr 2025')
   const [isSaving, setIsSaving] = useState(false)
   const [showAdditionalZone, setShowAdditionalZone] = useState(false)
+  const [customDrawings, setCustomDrawings] = useState<CustomDrawing[]>([])
 
   // Last publication tracking
   const [lastPublishedInfo, setLastPublishedInfo] = useState<{
@@ -130,6 +131,7 @@ export default function Create() {
         sessions: { asian: 'Neutral', london: 'Neutral', newYork: 'Neutral' },
         notes: '',
       })
+      setCustomDrawings([])
       toast.info('Analysis cleared.')
     }
   }
@@ -177,6 +179,7 @@ export default function Create() {
             status,
             visibility: 'free' as const,
             author_id: profile.id,
+            custom_drawings: customDrawings,
           }
 
           const zones = [
@@ -364,6 +367,8 @@ export default function Create() {
             invalidationLevel={analysis.invalidationLevel}
             onBullishZoneChange={handleBullishZoneFromChart}
             onBearishZoneChange={handleBearishZoneFromChart}
+            customDrawings={customDrawings}
+            onCustomDrawingsChange={setCustomDrawings}
             height={440}
             readOnly={false}
           />
