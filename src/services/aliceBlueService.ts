@@ -41,6 +41,9 @@ const STORAGE_KEY = 'alice_blue_credentials_v1'
 
 class AliceBlueService {
   private credentials: AliceBlueCredentials | null = null
+  private ws: WebSocket | null = null
+  private wsCallbacks: Set<(data: any) => void> = new Set()
+  private heartbeatInterval: NodeJS.Timeout | null = null
 
   constructor() {
     this.loadCredentials()
@@ -512,6 +515,111 @@ class AliceBlueService {
       success: true,
       orderId: simulatedOrderId,
       message: `Order submitted successfully via Alice Blue ANT A3 (${creds.environment.toUpperCase()} Mode). Order ID: ${simulatedOrderId}`,
+    }
+  }
+
+  /**
+   * WebSocket implementation for Alice Blue Market Data
+   */
+  public async connectWebSocket(): Promise<void> {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      return // Already connected
+    }
+
+    const creds = this.loadCredentials()
+    if (!creds || !creds.userId || !creds.sessionToken) {
+      console.error('[AliceBlue WS] Cannot connect. Missing credentials.')
+      return
+    }
+
+    return new Promise(async (resolve, reject) => {
+      try {
+        this.ws = new WebSocket('wss://ws1.aliceblueonline.com/NorenWS')
+
+        this.ws.onopen = async () => {
+          console.log('[AliceBlue WS] Connected')
+          
+          // Compute token per documentation
+          const hash1 = await this.computeSha256Checksum(creds.sessionToken!)
+          const hash2 = await this.computeSha256Checksum(hash1)
+          
+          const connectPayload = {
+            susertoken: hash2,
+            t: 'c',
+            actid: `${creds.userId}_API`,
+            uid: `${creds.userId}_API`,
+            source: 'API'
+          }
+          this.ws?.send(JSON.stringify(connectPayload))
+          
+          // Start heartbeat
+          this.heartbeatInterval = setInterval(() => {
+            if (this.ws?.readyState === WebSocket.OPEN) {
+              this.ws.send(JSON.stringify({ k: "", t: "h" }))
+            }
+          }, 45000)
+        }
+
+        this.ws.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            if (data.t === 'ck' && data.s === 'OK') {
+              resolve()
+            }
+            this.wsCallbacks.forEach(cb => cb(data))
+          } catch (e) {
+            console.error('[AliceBlue WS] Error parsing message', e)
+          }
+        }
+
+        this.ws.onerror = (error) => {
+          console.error('[AliceBlue WS] Error:', error)
+          reject(error)
+        }
+
+        this.ws.onclose = () => {
+          console.log('[AliceBlue WS] Disconnected')
+          if (this.heartbeatInterval) clearInterval(this.heartbeatInterval)
+        }
+      } catch (err) {
+        reject(err)
+      }
+    })
+  }
+
+  public disconnectWebSocket() {
+    if (this.ws) {
+      this.ws.close()
+      this.ws = null
+    }
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval)
+      this.heartbeatInterval = null
+    }
+  }
+
+  public subscribeMarketData(tokens: string) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        k: tokens,
+        t: 't'
+      }))
+    }
+  }
+
+  public subscribeDepthData(tokens: string) {
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify({
+        k: tokens,
+        t: 'd'
+      }))
+    }
+  }
+
+  public onWsMessage(callback: (data: any) => void) {
+    this.wsCallbacks.add(callback)
+    return () => {
+      this.wsCallbacks.delete(callback)
     }
   }
 }

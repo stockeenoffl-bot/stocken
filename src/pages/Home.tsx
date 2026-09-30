@@ -15,14 +15,9 @@ import {
   ShieldCheck,
 } from 'lucide-react'
 import CandlestickChart from '@/components/charts/CandlestickChart'
-import TradingViewChart from '@/components/charts/TradingViewChart'
 import InteractiveIndianChart, { type ZoneDefinition } from '@/components/charts/InteractiveIndianChart'
 import StatCard from '@/components/StatCard'
 import { Globe, Calendar, RotateCcw } from 'lucide-react'
-import {
-  TradingViewMarketQuotes,
-  TradingViewTechnicalAnalysis,
-} from '@/components/tradingview'
 import { useMarket } from '@/contexts/MarketContext'
 import { analysisService } from '@/services/analysisService'
 import { useAuth } from '@/contexts/AuthContext'
@@ -43,7 +38,7 @@ export default function Home() {
   const { market } = useMarket()
   const { profile, isSuperAdmin, isAdmin } = useAuth()
   const [analyses, setAnalyses] = useState<any[]>([])
-  const [chartMode, setChartMode] = useState<'system' | 'tradingview'>('system')
+
 
   // Real-Time Live Synced Market Data from Super Admin
   const [liveData, setLiveData] = useState<LiveMarketData>(broadcastSyncService.getMarketData(market))
@@ -255,54 +250,24 @@ export default function Home() {
               <RotateCcw size={11} />
               <span>Reset to Published Zones</span>
             </button>
-
-            <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
-              <button
-                onClick={() => setChartMode('system')}
-                className={`px-3 py-1 rounded-md font-medium transition-all ${
-                  chartMode === 'system'
-                    ? 'bg-[var(--accent-indigo)] text-white'
-                    : 'text-[var(--text-secondary)] hover:text-white'
-                }`}
-              >
-                Zonal Edge Pro (Interactive)
-              </button>
-              <button
-                onClick={() => setChartMode('tradingview')}
-                className={`px-3 py-1 rounded-md font-medium transition-all ${
-                  chartMode === 'tradingview'
-                    ? 'bg-[var(--accent-indigo)] text-white'
-                    : 'text-[var(--text-secondary)] hover:text-white'
-                }`}
-              >
-                TradingView Indian Pro
-              </button>
-            </div>
           </div>
         </div>
 
-        {chartMode === 'system' ? (
-          <InteractiveIndianChart
-            market={market}
-            timeframe="15m"
-            bullishZone={customBullish}
-            bearishZone={customBearish}
-            invalidationLevel={
-              typeof liveData.invalidationLevel === 'number'
-                ? liveData.invalidationLevel
-                : 24100
-            }
-            onBullishZoneChange={(z) => setCustomBullish(z)}
-            onBearishZoneChange={(z) => setCustomBearish(z)}
-            readOnly={false}
-            height={460}
-          />
-        ) : (
-          <TradingViewChart
-            defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'BSE:NIFTY50'}
-            height={540}
-          />
-        )}
+        <InteractiveIndianChart
+          market={market}
+          timeframe="15m"
+          bullishZone={customBullish}
+          bearishZone={customBearish}
+          invalidationLevel={
+            typeof liveData.invalidationLevel === 'number'
+              ? liveData.invalidationLevel
+              : 24100
+          }
+          onBullishZoneChange={(z) => setCustomBullish(z)}
+          onBearishZoneChange={(z) => setCustomBearish(z)}
+          readOnly={false}
+          height={460}
+        />
       </motion.div>
 
       {/* Detailed Analysis Content */}
@@ -424,38 +389,7 @@ export default function Home() {
         </div>
       </motion.div>
 
-      {/* Indian Markets Live Pulse Section */}
-      <motion.div variants={itemVariants} className="space-y-3 pt-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-bold text-[var(--text-primary)]">
-              Indian Markets Live Watchlist & Sentiment
-            </span>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
-              TradingView Live
-            </span>
-          </div>
-          <Link
-            to="/app/indian-markets"
-            className="text-xs text-[var(--accent-indigo)] hover:underline font-semibold flex items-center gap-1"
-          >
-            <span>Open Indian Markets Command Center</span>
-            <span>&rarr;</span>
-          </Link>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2">
-            <TradingViewMarketQuotes height={520} />
-          </div>
-          <div>
-            <TradingViewTechnicalAnalysis
-              defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
-              height={450}
-            />
-          </div>
-        </div>
-      </motion.div>
     </motion.div>
   )
 }

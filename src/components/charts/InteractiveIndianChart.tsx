@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { createChart, ColorType, IChartApi, ISeriesApi, Time, CandlestickData } from 'lightweight-charts'
 import {
   Maximize2,
   Minimize2,
@@ -6,13 +7,6 @@ import {
   Slash,
   Square,
   Type,
-  Ruler,
-  ZoomIn,
-  Move,
-  Trash2,
-  TrendingUp,
-  TrendingDown,
-  Layers,
   Radio,
   RotateCcw,
 } from 'lucide-react'
@@ -25,13 +19,13 @@ export interface ZoneDefinition {
   label?: string
 }
 
-export interface CustomDrawing {
+export interface LogicalDrawing {
   id: string
   type: 'line' | 'zone' | 'text'
-  x1: number
-  y1: number
-  x2: number
-  y2: number
+  time1: number
+  price1: number
+  time2: number
+  price2: number
   text?: string
 }
 
@@ -43,21 +37,20 @@ interface InteractiveIndianChartProps {
   invalidationLevel?: number
   onBullishZoneChange?: (zone: ZoneDefinition) => void
   onBearishZoneChange?: (zone: ZoneDefinition) => void
-  customDrawings?: CustomDrawing[]
-  onCustomDrawingsChange?: (drawings: CustomDrawing[]) => void
+  customDrawings?: LogicalDrawing[]
+  onCustomDrawingsChange?: (drawings: LogicalDrawing[]) => void
   height?: number
   readOnly?: boolean
 }
 
-// Generate realistic Indian market intraday candles
-function generateIndianCandles(market: string, basePrice: number, count = 48) {
-  const candles = []
+function generateIndianCandles(market: string, basePrice: number, count = 100) {
+  const candles: CandlestickData[] = []
   let current = basePrice - 180
-  const now = Date.now()
-  const intervalMs = 15 * 60 * 1000 // 15m
+  const now = Math.floor(Date.now() / 1000)
+  const interval = 15 * 60 // 15m in seconds
 
   for (let i = count; i >= 0; i--) {
-    const time = new Date(now - i * intervalMs)
+    const time = (now - i * interval) as Time
     const volatility = market === 'SENSEX' ? 45 : 16
     const dir = Math.sin(i * 0.35) + (Math.random() - 0.48)
     const change = dir * volatility
@@ -67,30 +60,9 @@ function generateIndianCandles(market: string, basePrice: number, count = 48) {
     const high = Number((Math.max(open, close) + Math.random() * (volatility * 0.8)).toFixed(2))
     const low = Number((Math.min(open, close) - Math.random() * (volatility * 0.8)).toFixed(2))
 
-    candles.push({
-      time: time.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-      day: time.getDate().toString(),
-      fullDate: time,
-      open,
-      high,
-      low,
-      close,
-      isGreen: close >= open,
-    })
-
+    candles.push({ time, open, high, low, close })
     current = close
   }
-
-  // Set latest close precisely around target
-  if (candles.length > 0) {
-    const last = candles[candles.length - 1]
-    last.open = market === 'SENSEX' ? 79410.5 : 24246.5
-    last.high = market === 'SENSEX' ? 79460.0 : 24254.1
-    last.low = market === 'SENSEX' ? 79390.2 : 24238.9
-    last.close = market === 'SENSEX' ? 79420.2 : 24250.7
-    last.isGreen = true
-  }
-
   return candles
 }
 
@@ -107,85 +79,16 @@ export default function InteractiveIndianChart({
   height = 460,
   readOnly = false,
 }: InteractiveIndianChartProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
+  const chartContainerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
+  const chartRef = useRef<IChartApi | null>(null)
+  const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null)
 
   const [activeTf, setActiveTf] = useState(timeframe)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const [activeTool, setActiveTool] = useState<'cursor' | 'line' | 'zone' | 'text' | 'measure'>('cursor')
-  const [dragState, setDragState] = useState<{
-    zone: 'bullish' | 'bearish'
-    edge: 'top' | 'bottom' | 'move'
-    startY: number
-    initialFrom: number
-    initialTo: number
-  } | null>(null)
-
-  const basePrice = market === 'SENSEX' ? 79420.2 : 24250.7
+  const [activeTool, setActiveTool] = useState<'cursor' | 'line' | 'zone' | 'text'>('cursor')
   
-  const [candles, setCandles] = useState<any[]>([])
-
-  useEffect(() => {
-    async function loadCandles() {
-      // Determine resolution
-      let resolution = '1' // 1 minute by default
-      if (activeTf === '1D' || activeTf === 'D') resolution = 'D'
-      // AliceBlue might not support 15m directly in the basic `history` endpoint, usually you get 1m and build 15m.
-      // But we will pass the requested resolution or fallback.
-      if (['5m', '15m', '1H', '4H'].includes(activeTf)) resolution = '1'
-
-      const toTime = Date.now()
-      const fromTime = toTime - 3 * 24 * 60 * 60 * 1000 // Last 3 days
-
-      const data = await aliceBlueService.getHistoricalData({
-        symbol: market,
-        exchange: 'NSE', // Overridden in service for indices
-        resolution,
-        from: fromTime,
-        to: toTime
-      })
-
-      if (data && data.length > 0) {
-        // Map AliceBlue format to our internal format
-        // API format: { "volume": 0.0, "high": 23727.45, "low": 23675.25, "time": "2026-05-19 09:15:59", "close": 23715.65, "open": 23675.3 }
-        const mappedCandles = data.map(d => {
-          const dt = new Date(d.time)
-          return {
-            time: dt.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: false }),
-            day: dt.getDate().toString(),
-            fullDate: dt,
-            open: d.open,
-            high: d.high,
-            low: d.low,
-            close: d.close,
-            isGreen: d.close >= d.open,
-          }
-        })
-        
-        // If we got 1m data but requested 15m, we technically should group them,
-        // but for now just display what we got (or subsample for performance)
-        setCandles(mappedCandles.slice(-100)) // Keep last 100 to fit SVG
-      } else {
-        // Fallback to generated data if API fails or during market hours (when it's disabled)
-        setCandles(generateIndianCandles(market, basePrice))
-      }
-    }
-    loadCandles()
-  }, [market, activeTf, basePrice])
-
-  // Alice Blue Live API Quotes Feed
-  const [liveQuote, setLiveQuote] = useState<{
-    ltp: number
-    change: number
-    changePercent: number
-    open: number
-    high: number
-    low: number
-  } | null>(null)
-  const [lastTickDir, setLastTickDir] = useState<'up' | 'down' | 'flat'>('flat')
-
-  // Custom User Drawings (Lines, Zones, Annotations)
-  const [internalCustomDrawings, setInternalCustomDrawings] = useState<CustomDrawing[]>([])
+  const [internalCustomDrawings, setInternalCustomDrawings] = useState<LogicalDrawing[]>([])
   const customDrawings = externalCustomDrawings ?? internalCustomDrawings
   const setCustomDrawings = onCustomDrawingsChange ?? setInternalCustomDrawings
 
@@ -196,9 +99,170 @@ export default function InteractiveIndianChart({
     x2: number
     y2: number
   } | null>(null)
+  
+  // Need to force re-render when chart pans/zooms to update SVG overlay
+  const [, setRenderTrigger] = useState(0)
+  const forceUpdate = useCallback(() => setRenderTrigger(t => t + 1), [])
 
+  const [liveQuote, setLiveQuote] = useState<any>(null)
+  const [lastTickDir, setLastTickDir] = useState<'up' | 'down' | 'flat'>('flat')
+  
+  const basePrice = market === 'SENSEX' ? 79420.2 : 24250.7
+
+  // Initialize Lightweight Chart
+  useEffect(() => {
+    if (!chartContainerRef.current) return
+
+    const handleResize = () => {
+      chartRef.current?.applyOptions({ width: chartContainerRef.current?.clientWidth })
+      forceUpdate()
+    }
+
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: '#0A0D16' },
+        textColor: '#64748B',
+      },
+      grid: {
+        vertLines: { color: '#161E30', style: 3 }, // style 3 is dashed
+        horzLines: { color: '#161E30', style: 3 },
+      },
+      crosshair: {
+        mode: 1, // Normal mode
+        vertLine: { color: '#334155', width: 1, style: 1 },
+        horzLine: { color: '#334155', width: 1, style: 1 },
+      },
+      timeScale: {
+        borderColor: '#1A2234',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      rightPriceScale: {
+        borderColor: '#1A2234',
+      },
+      width: chartContainerRef.current.clientWidth,
+      height: isFullscreen ? window.innerHeight - 50 : height - 50,
+    })
+
+    const candlestickSeries = chart.addCandlestickSeries({
+      upColor: '#22C55E',
+      downColor: '#EF4444',
+      borderVisible: false,
+      wickUpColor: '#22C55E',
+      wickDownColor: '#EF4444',
+    })
+
+    chartRef.current = chart
+    seriesRef.current = candlestickSeries
+
+    // Load initial data
+    const fetchHistory = async () => {
+      try {
+        const toTime = Date.now()
+        const fromTime = toTime - 3 * 24 * 60 * 60 * 1000
+        const data = await aliceBlueService.getHistoricalData({
+          symbol: market,
+          exchange: 'NSE',
+          resolution: '1',
+          from: fromTime,
+          to: toTime
+        })
+
+        if (data && data.length > 0) {
+          const mapped = data.map((d: any) => ({
+            time: (new Date(d.time).getTime() / 1000) as Time,
+            open: d.open,
+            high: d.high,
+            low: d.low,
+            close: d.close,
+          })).sort((a: any, b: any) => (a.time as number) - (b.time as number))
+          candlestickSeries.setData(mapped)
+        } else {
+          candlestickSeries.setData(generateIndianCandles(market, basePrice))
+        }
+      } catch (err) {
+        candlestickSeries.setData(generateIndianCandles(market, basePrice))
+      }
+      
+      // Auto scale once data is loaded
+      chart.timeScale().fitContent()
+    }
+    fetchHistory()
+
+    chart.timeScale().subscribeVisibleTimeRangeChange(() => {
+      forceUpdate()
+    })
+    chart.subscribeCrosshairMove(() => {
+      forceUpdate()
+    })
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      chart.remove()
+    }
+  }, [market, height, isFullscreen])
+
+  // Real-time WebSockets Live Data
+  useEffect(() => {
+    let lastP = basePrice
+    const token = market === 'SENSEX' ? 'BSE|1' : 'NSE|26000'
+    let unsubscribeWs = () => {}
+
+    const setupWs = async () => {
+      try {
+        await aliceBlueService.connectWebSocket()
+        aliceBlueService.subscribeMarketData(token)
+        
+        unsubscribeWs = aliceBlueService.onWsMessage((data) => {
+          if ((data.t === 'tf' || data.t === 'tk') && data.lp) {
+            const ltp = parseFloat(data.lp)
+            if (isNaN(ltp)) return
+            
+            if (ltp > lastP) setLastTickDir('up')
+            else if (ltp < lastP) setLastTickDir('down')
+            lastP = ltp
+            
+            setLiveQuote((prev: any) => {
+              const updated = {
+                ltp,
+                change: data.pc ? (ltp * parseFloat(data.pc) / 100) : (prev?.change ?? 0),
+                changePercent: data.pc ? parseFloat(data.pc) : (prev?.changePercent ?? 0),
+                open: data.o ? parseFloat(data.o) : (prev?.open ?? ltp),
+                high: data.h ? parseFloat(data.h) : Math.max(prev?.high ?? ltp, ltp),
+                low: data.l ? parseFloat(data.l) : Math.min(prev?.low ?? ltp, ltp),
+              }
+              // Update chart candle
+              if (seriesRef.current) {
+                const now = Math.floor(Date.now() / 1000) as Time
+                seriesRef.current.update({
+                  time: now,
+                  open: updated.open,
+                  high: updated.high,
+                  low: updated.low,
+                  close: updated.ltp,
+                })
+                forceUpdate()
+              }
+              return updated
+            })
+          }
+        })
+      } catch (err) {
+        console.warn('Alice Blue WS stream error:', err)
+      }
+    }
+    
+    setupWs()
+
+    return () => {
+      unsubscribeWs()
+    }
+  }, [market, basePrice])
+
+  // Drawing Tools Logic
   const handleSvgMouseDown = (e: React.MouseEvent<SVGSVGElement>) => {
-    if (readOnly || activeTool === 'cursor') return
+    if (readOnly || activeTool === 'cursor' || !chartRef.current || !seriesRef.current) return
 
     const rect = svgRef.current?.getBoundingClientRect()
     if (!rect) return
@@ -208,10 +272,14 @@ export default function InteractiveIndianChart({
     if (activeTool === 'text') {
       const text = window.prompt('Enter annotation text:')
       if (text) {
-        setCustomDrawings([
-          ...customDrawings,
-          { id: Date.now().toString(), type: 'text', x1: x, y1: y, x2: x, y2: y, text },
-        ])
+        const time = chartRef.current.timeScale().coordinateToTime(x) as number
+        const price = seriesRef.current.coordinateToPrice(y)
+        if (time && price) {
+          setCustomDrawings([
+            ...customDrawings,
+            { id: Date.now().toString(), type: 'text', time1: time, price1: price, time2: time, price2: price, text },
+          ])
+        }
       }
       setActiveTool('cursor')
       return
@@ -228,202 +296,66 @@ export default function InteractiveIndianChart({
     if (!rect) return
     const x = e.clientX - rect.left
     const y = e.clientY - rect.top
-
     setCurrentDrawing((prev) => (prev ? { ...prev, x2: x, y2: y } : null))
   }
 
   const handleSvgMouseUp = () => {
-    if (currentDrawing) {
+    if (currentDrawing && chartRef.current && seriesRef.current) {
       if (Math.abs(currentDrawing.x2 - currentDrawing.x1) > 2 || Math.abs(currentDrawing.y2 - currentDrawing.y1) > 2) {
-        setCustomDrawings([
-          ...customDrawings,
-          { id: Date.now().toString(), ...currentDrawing },
-        ])
+        
+        const time1 = chartRef.current.timeScale().coordinateToTime(currentDrawing.x1) as number
+        const price1 = seriesRef.current.coordinateToPrice(currentDrawing.y1)
+        const time2 = chartRef.current.timeScale().coordinateToTime(currentDrawing.x2) as number
+        const price2 = seriesRef.current.coordinateToPrice(currentDrawing.y2)
+
+        if (time1 && price1 && time2 && price2) {
+          setCustomDrawings([
+            ...customDrawings,
+            { id: Date.now().toString(), type: currentDrawing.type, time1, price1, time2, price2 }
+          ])
+        }
       }
       setCurrentDrawing(null)
     }
   }
 
-  // Stream live ticks from Alice Blue API
-  useEffect(() => {
-    let lastP = basePrice
-    const fetchLiveQuote = async () => {
-      try {
-        const quotes = await aliceBlueService.getLiveIndexQuotes()
-        const targetSym = market === 'SENSEX' ? 'SENSEX' : 'NIFTY 50'
-        const match = quotes.find((q) => q.symbol === targetSym)
-        if (match) {
-          if (match.ltp > lastP) setLastTickDir('up')
-          else if (match.ltp < lastP) setLastTickDir('down')
-          lastP = match.ltp
-          setLiveQuote({
-            ltp: match.ltp,
-            change: match.change,
-            changePercent: match.changePercent,
-            open: match.open,
-            high: match.high,
-            low: match.low,
-          })
-        }
-      } catch (err) {
-        console.warn('Alice Blue quote stream error:', err)
-      }
-    }
+  const mapLogicalToScreen = (d: LogicalDrawing) => {
+    if (!chartRef.current || !seriesRef.current) return null
+    const x1 = chartRef.current.timeScale().timeToCoordinate(d.time1 as Time)
+    const y1 = seriesRef.current.priceToCoordinate(d.price1)
+    const x2 = chartRef.current.timeScale().timeToCoordinate(d.time2 as Time)
+    const y2 = seriesRef.current.priceToCoordinate(d.price2)
 
-    fetchLiveQuote()
-    const timer = setInterval(fetchLiveQuote, 2000)
-    return () => clearInterval(timer)
-  }, [market, basePrice])
-
-  const latestCandle = candles[candles.length - 1] || {
-    open: 24246.5,
-    high: 24254.1,
-    low: 24238.9,
-    close: 24250.7,
+    if (x1 === null || y1 === null || x2 === null || y2 === null) return null
+    return { ...d, x1, y1, x2, y2 }
   }
 
-  const currentLtp = liveQuote?.ltp ?? latestCandle.close
-  const currentOpen = liveQuote?.open ?? latestCandle.open
-  const currentHigh = Math.max(latestCandle.high, liveQuote?.high ?? latestCandle.high)
-  const currentLow = Math.min(latestCandle.low, liveQuote?.low ?? latestCandle.low)
-  const currentChange = liveQuote?.change ?? 4.20
-  const currentChangePercent = liveQuote?.changePercent ?? 0.02
+  const mappedDrawings = customDrawings.map(mapLogicalToScreen).filter(Boolean) as any[]
 
-  // Calculate price boundaries for scaling
-  const allPrices = candles.flatMap((c) => [c.high, c.low])
-  allPrices.push(bullishZone.from, bullishZone.to, bearishZone.from, bearishZone.to, currentLtp)
-  if (invalidationLevel) allPrices.push(invalidationLevel)
-
-  // Avoid infinity if no candles yet
-  const minPrice = allPrices.length > 0 ? Math.min(...allPrices) - 60 : basePrice - 100
-  const maxPrice = allPrices.length > 0 ? Math.max(...allPrices) + 60 : basePrice + 100
-  const priceRange = maxPrice - minPrice || 1
-
-  // Chart dimensions inside SVG
-  const paddingRight = 90
-  const paddingBottom = 30
-  const paddingTop = 20
-  const paddingLeft = 10
-  const chartHeight = height - paddingTop - paddingBottom
-
-  // Conversion: price to Y pixel
-  const priceToY = (price: number) => {
-    const ratio = (price - minPrice) / priceRange
-    return paddingTop + chartHeight * (1 - ratio)
-  }
-
-  // Conversion: Y pixel to price
-  const yToPrice = (y: number) => {
-    const ratio = (y - paddingTop) / chartHeight
-    const raw = maxPrice - ratio * priceRange
-    return Math.round(raw / 5) * 5 // snap to nearest 5 points
-  }
-
-  // Price scale grid steps
-  const priceStep = market === 'SENSEX' ? 200 : 100
-  const startGridPrice = Math.ceil(minPrice / priceStep) * priceStep
-  const gridPrices = []
-  for (let p = startGridPrice; p <= maxPrice; p += priceStep) {
-    gridPrices.push(p)
-  }
-
-  // Handle Dragging / Resizing of Zones directly on the chart
-  const handleMouseDown = (zone: 'bullish' | 'bearish', edge: 'top' | 'bottom' | 'move', e: React.MouseEvent) => {
-    if (readOnly) return
-    e.stopPropagation()
-    const target = zone === 'bullish' ? bullishZone : bearishZone
-    setDragState({
-      zone,
-      edge,
-      startY: e.clientY,
-      initialFrom: target.from,
-      initialTo: target.to,
-    })
-  }
-
-  useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!dragState || !svgRef.current) return
-      const rect = svgRef.current.getBoundingClientRect()
-      const currentY = e.clientY - rect.top
-      const newPrice = yToPrice(currentY)
-
-      if (dragState.zone === 'bullish' && onBullishZoneChange) {
-        if (dragState.edge === 'top') {
-          onBullishZoneChange({
-            ...bullishZone,
-            to: Math.max(newPrice, bullishZone.from + 10),
-          })
-        } else if (dragState.edge === 'bottom') {
-          onBullishZoneChange({
-            ...bullishZone,
-            from: Math.min(newPrice, bullishZone.to - 10),
-          })
-        } else if (dragState.edge === 'move') {
-          const deltaPrice = yToPrice(e.clientY) - yToPrice(dragState.startY)
-          onBullishZoneChange({
-            ...bullishZone,
-            from: Math.round(dragState.initialFrom + deltaPrice),
-            to: Math.round(dragState.initialTo + deltaPrice),
-          })
-        }
-      } else if (dragState.zone === 'bearish' && onBearishZoneChange) {
-        if (dragState.edge === 'top') {
-          onBearishZoneChange({
-            ...bearishZone,
-            to: Math.max(newPrice, bearishZone.from + 10),
-          })
-        } else if (dragState.edge === 'bottom') {
-          onBearishZoneChange({
-            ...bearishZone,
-            from: Math.min(newPrice, bearishZone.to - 10),
-          })
-        } else if (dragState.edge === 'move') {
-          const deltaPrice = yToPrice(e.clientY) - yToPrice(dragState.startY)
-          onBearishZoneChange({
-            ...bearishZone,
-            from: Math.round(dragState.initialFrom + deltaPrice),
-            to: Math.round(dragState.initialTo + deltaPrice),
-          })
-        }
-      }
+  // Bullish/Bearish predefined Zones to SVG
+  const mapZoneToScreen = (zone: ZoneDefinition) => {
+    if (!seriesRef.current || !chartRef.current) return null
+    const yTop = seriesRef.current.priceToCoordinate(zone.to)
+    const yBottom = seriesRef.current.priceToCoordinate(zone.from)
+    if (yTop === null || yBottom === null) return null
+    const width = chartRef.current.timeScale().width() - 50 // Leave space for price scale
+    return {
+      y: Math.min(yTop, yBottom),
+      height: Math.abs(yBottom - yTop),
+      width
     }
-
-    const handleMouseUp = () => {
-      setDragState(null)
-    }
-
-    if (dragState) {
-      window.addEventListener('mousemove', handleMouseMove)
-      window.addEventListener('mouseup', handleMouseUp)
-    }
-
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove)
-      window.removeEventListener('mouseup', handleMouseUp)
-    }
-  }, [dragState, bullishZone, bearishZone, onBullishZoneChange, onBearishZoneChange])
-
-  // Zone Coordinates
-  const bearishYTop = Math.min(priceToY(bearishZone.to), priceToY(bearishZone.from))
-  const bearishYBottom = Math.max(priceToY(bearishZone.to), priceToY(bearishZone.from))
-  const bearishHeight = Math.max(16, bearishYBottom - bearishYTop)
-
-  const bullishYTop = Math.min(priceToY(bullishZone.to), priceToY(bullishZone.from))
-  const bullishYBottom = Math.max(priceToY(bullishZone.to), priceToY(bullishZone.from))
-  const bullishHeight = Math.max(16, bullishYBottom - bullishYTop)
-
-  const currentPriceY = priceToY(latestCandle.close)
+  }
+  const bullishScreenZone = mapZoneToScreen(bullishZone)
+  const bearishScreenZone = mapZoneToScreen(bearishZone)
 
   return (
     <div
-      ref={containerRef}
       className={`rounded-xl border border-[var(--border-subtle)] bg-[#0C1019] overflow-hidden flex flex-col select-none transition-all ${
         isFullscreen ? 'fixed inset-0 z-50 rounded-none border-none' : ''
       }`}
-      style={{ height: isFullscreen ? '100vh' : height + 50 }}
+      style={{ height: isFullscreen ? '100vh' : height }}
     >
-      {/* Top Chart Header matching Screenshot 2 */}
+      {/* Top Chart Header */}
       <div className="flex flex-wrap items-center justify-between px-4 py-2.5 border-b border-[#1A2234] bg-[#0E1424] gap-2">
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
@@ -433,396 +365,104 @@ export default function InteractiveIndianChart({
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
           </div>
 
-          {/* Alice Blue Live Indicator */}
           <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-[10px] font-bold text-emerald-400">
             <Radio size={11} className="animate-pulse" />
             <span>Alice Blue Live Feed</span>
           </div>
 
-          {/* Timeframe Buttons */}
-          <div className="flex items-center gap-1 bg-[#131B2E] p-0.5 rounded-md border border-[#1E293B]">
-            {['5m', '15m', '1H', '4H', 'D'].map((tf) => (
-              <button
-                key={tf}
-                type="button"
-                onClick={() => setActiveTf(tf)}
-                className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
-                  activeTf === tf
-                    ? 'bg-indigo-600 text-white shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                {tf}
-              </button>
-            ))}
-          </div>
-
-          {/* OHLC Bar with Live Alice Blue Tick */}
           <div className="hidden lg:flex items-center gap-2.5 text-[11px] font-mono">
-            <span className="text-slate-400">O <span className="text-white">{currentOpen.toFixed(2)}</span></span>
-            <span className="text-slate-400">H <span className="text-emerald-400">{currentHigh.toFixed(2)}</span></span>
-            <span className="text-slate-400">L <span className="text-rose-400">{currentLow.toFixed(2)}</span></span>
-            <span className="text-slate-400">
-              C{' '}
-              <span
-                className={`font-bold px-1 rounded transition-colors ${
-                  lastTickDir === 'up'
-                    ? 'bg-emerald-500/20 text-emerald-300'
-                    : lastTickDir === 'down'
-                    ? 'bg-rose-500/20 text-rose-300'
-                    : 'text-emerald-400'
-                }`}
-              >
-                {currentLtp.toFixed(2)}
-              </span>
-            </span>
-            <span className={`font-bold ${currentChange >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-              {currentChange >= 0 ? '+' : ''}{currentChange.toFixed(2)} ({currentChange >= 0 ? '+' : ''}{currentChangePercent.toFixed(2)}%)
-            </span>
+            {liveQuote ? (
+              <>
+                <span className="text-slate-400">O <span className="text-white">{liveQuote.open?.toFixed(2)}</span></span>
+                <span className="text-slate-400">H <span className="text-emerald-400">{liveQuote.high?.toFixed(2)}</span></span>
+                <span className="text-slate-400">L <span className="text-rose-400">{liveQuote.low?.toFixed(2)}</span></span>
+                <span className="text-slate-400">
+                  C{' '}
+                  <span className={`font-bold px-1 rounded transition-colors ${
+                    lastTickDir === 'up' ? 'bg-emerald-500/20 text-emerald-300' :
+                    lastTickDir === 'down' ? 'bg-rose-500/20 text-rose-300' : 'text-emerald-400'
+                  }`}>
+                    {liveQuote.ltp?.toFixed(2)}
+                  </span>
+                </span>
+              </>
+            ) : (
+              <span className="text-slate-500">Waiting for tick data...</span>
+            )}
           </div>
         </div>
-
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setIsFullscreen(!isFullscreen)}
-            className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1A2234] transition-colors"
-            title={isFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-          >
+          <button onClick={() => setIsFullscreen(!isFullscreen)} className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1A2234]">
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
           </button>
         </div>
       </div>
 
-      {/* Main Chart Body: Left Toolbar + Candlestick SVG + Right Price Scale */}
       <div className="flex-1 flex overflow-hidden relative">
-        {/* Left Toolbar (matching Screenshot 2) */}
+        {/* Left Toolbar */}
         {!readOnly && (
-          <div className="w-10 border-r border-[#1A2234] bg-[#0E1424] flex flex-col items-center py-2.5 gap-2 z-10">
-            <button
-              type="button"
-              onClick={() => setActiveTool('cursor')}
-              className={`p-1.5 rounded transition-all ${
-                activeTool === 'cursor' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Crosshair Cursor"
-            >
+          <div className="w-10 border-r border-[#1A2234] bg-[#0E1424] flex flex-col items-center py-2.5 gap-2 z-20">
+            <button onClick={() => setActiveTool('cursor')} className={`p-1.5 rounded transition-all ${activeTool === 'cursor' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
               <Crosshair size={15} />
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTool('line')}
-              className={`p-1.5 rounded transition-all ${
-                activeTool === 'line' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Trendline Tool"
-            >
+            <button onClick={() => setActiveTool('line')} className={`p-1.5 rounded transition-all ${activeTool === 'line' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
               <Slash size={15} />
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTool('zone')}
-              className={`p-1.5 rounded transition-all ${
-                activeTool === 'zone' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Zone Rectangle Tool (Click & Drag to mark)"
-            >
+            <button onClick={() => setActiveTool('zone')} className={`p-1.5 rounded transition-all ${activeTool === 'zone' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
               <Square size={15} />
             </button>
-            <button
-              type="button"
-              onClick={() => setActiveTool('text')}
-              className={`p-1.5 rounded transition-all ${
-                activeTool === 'text' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Annotation Text Tool"
-            >
+            <button onClick={() => setActiveTool('text')} className={`p-1.5 rounded transition-all ${activeTool === 'text' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'}`}>
               <Type size={15} />
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTool('measure')}
-              className={`p-1.5 rounded transition-all ${
-                activeTool === 'measure' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-white'
-              }`}
-              title="Measure Risk / Reward"
-            >
-              <Ruler size={15} />
-            </button>
-            <button
-              type="button"
-              className="p-1.5 rounded text-slate-400 hover:text-white transition-all mt-auto"
-              title="Zoom In"
-            >
-              <ZoomIn size={15} />
             </button>
           </div>
         )}
 
-        {/* SVG Drawing Canvas & Candlesticks */}
-        <div className="flex-1 relative overflow-hidden bg-[#0A0D16]">
+        {/* Chart Area */}
+        <div className="flex-1 relative">
+          <div ref={chartContainerRef} className="absolute inset-0" />
+          
+          {/* Drawing SVG Overlay */}
           <svg
             ref={svgRef}
-            className={`w-full h-full ${activeTool !== 'cursor' ? 'cursor-crosshair' : 'cursor-default'}`}
-            viewBox={`0 0 1000 ${height}`}
-            preserveAspectRatio="none"
+            className={`absolute inset-0 w-full h-full z-10 ${activeTool !== 'cursor' ? 'cursor-crosshair pointer-events-auto' : 'pointer-events-none'}`}
             onMouseDown={handleSvgMouseDown}
             onMouseMove={handleSvgMouseMove}
             onMouseUp={handleSvgMouseUp}
             onMouseLeave={handleSvgMouseUp}
           >
-            <defs>
-              {/* Bearish Gradient */}
-              <linearGradient id="bearishGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#EF4444" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#EF4444" stopOpacity="0.14" />
-              </linearGradient>
-              {/* Bullish Gradient */}
-              <linearGradient id="bullishGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#22C55E" stopOpacity="0.28" />
-                <stop offset="100%" stopColor="#22C55E" stopOpacity="0.14" />
-              </linearGradient>
-            </defs>
-
-            {/* Grid Lines */}
-            {gridPrices.map((price) => {
-              const y = priceToY(price)
-              return (
-                <g key={price}>
-                  <line
-                    x1="0"
-                    y1={y}
-                    x2={1000 - paddingRight}
-                    y2={y}
-                    stroke="#161E30"
-                    strokeWidth="1"
-                    strokeDasharray="4 4"
-                  />
-                  {/* Right Axis Price Label */}
-                  <text
-                    x={1000 - paddingRight + 8}
-                    y={y + 3.5}
-                    fill="#64748B"
-                    fontSize="10"
-                    fontFamily="monospace"
-                  >
-                    {price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </text>
-                </g>
-              )
-            })}
-
-            {/* Time Grid Lines */}
-            {candles.map((c, i) => {
-              if (i % 8 !== 0) return null
-              const x = (i / candles.length) * (1000 - paddingRight - paddingLeft) + paddingLeft
-              return (
-                <g key={i}>
-                  <line
-                    x1={x}
-                    y1={paddingTop}
-                    x2={x}
-                    y2={height - paddingBottom}
-                    stroke="#141B2B"
-                    strokeWidth="1"
-                    strokeDasharray="3 3"
-                  />
-                  <text
-                    x={x}
-                    y={height - 10}
-                    fill="#64748B"
-                    fontSize="10"
-                    fontFamily="monospace"
-                    textAnchor="middle"
-                  >
-                    {c.day ? `${c.day} ` : ''}{c.time}
-                  </text>
-                </g>
-              )
-            })}
-
-            {/* VISUAL BEARISH ZONE OVERLAY (Red Box matching Screenshot 2) */}
-            {bearishZone && bearishZone.from > 0 && bearishZone.to > 0 && (
-              <g className="group transition-all">
-                {/* Translucent Zone Box */}
-                <rect
-                  x="40"
-                  y={bearishYTop}
-                  width={1000 - paddingRight - 40}
-                  height={bearishHeight}
-                  fill="url(#bearishGrad)"
-                  stroke="#EF4444"
-                  strokeWidth="1.5"
-                  className={readOnly ? '' : 'cursor-move hover:stroke-rose-400'}
-                  onMouseDown={(e) => handleMouseDown('bearish', 'move', e)}
-                />
-                {/* Top Drag Handle */}
-                {!readOnly && (
-                  <rect
-                    x="40"
-                    y={bearishYTop - 3}
-                    width={1000 - paddingRight - 40}
-                    height="6"
-                    fill="transparent"
-                    className="cursor-ns-resize"
-                    onMouseDown={(e) => handleMouseDown('bearish', 'top', e)}
-                  />
-                )}
-                {/* Bottom Drag Handle */}
-                {!readOnly && (
-                  <rect
-                    x="40"
-                    y={bearishYBottom - 3}
-                    width={1000 - paddingRight - 40}
-                    height="6"
-                    fill="transparent"
-                    className="cursor-ns-resize"
-                    onMouseDown={(e) => handleMouseDown('bearish', 'bottom', e)}
-                  />
-                )}
-                {/* Zone Label Badge (Top-Right inside zone) */}
-                <rect
-                  x={1000 - paddingRight - 150}
-                  y={bearishYTop + 4}
-                  width="142"
-                  height="20"
-                  rx="4"
-                  fill="#7F1D1D"
-                  fillOpacity="0.85"
-                  stroke="#EF4444"
-                  strokeWidth="1"
-                />
-                <text
-                  x={1000 - paddingRight - 79}
-                  y={bearishYTop + 18}
-                  fill="#FECDD3"
-                  fontSize="9.5"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  letterSpacing="0.5"
-                >
-                  BEARISH ZONE {bearishZone.from} - {bearishZone.to}
-                </text>
-              </g>
+            {/* Bullish & Bearish Built-in Zones */}
+            {bearishScreenZone && (
+              <rect
+                x={0}
+                y={bearishScreenZone.y}
+                width={bearishScreenZone.width}
+                height={bearishScreenZone.height}
+                fill="#EF4444"
+                fillOpacity="0.15"
+                stroke="#EF4444"
+                strokeWidth="1"
+              />
+            )}
+            {bullishScreenZone && (
+              <rect
+                x={0}
+                y={bullishScreenZone.y}
+                width={bullishScreenZone.width}
+                height={bullishScreenZone.height}
+                fill="#22C55E"
+                fillOpacity="0.15"
+                stroke="#22C55E"
+                strokeWidth="1"
+              />
             )}
 
-            {/* VISUAL BULLISH ZONE OVERLAY (Green Box matching Screenshot 2) */}
-            {bullishZone && bullishZone.from > 0 && bullishZone.to > 0 && (
-              <g className="group transition-all">
-                {/* Translucent Zone Box */}
-                <rect
-                  x="40"
-                  y={bullishYTop}
-                  width={1000 - paddingRight - 40}
-                  height={bullishHeight}
-                  fill="url(#bullishGrad)"
-                  stroke="#22C55E"
-                  strokeWidth="1.5"
-                  className={readOnly ? '' : 'cursor-move hover:stroke-emerald-400'}
-                  onMouseDown={(e) => handleMouseDown('bullish', 'move', e)}
-                />
-                {/* Top Drag Handle */}
-                {!readOnly && (
-                  <rect
-                    x="40"
-                    y={bullishYTop - 3}
-                    width={1000 - paddingRight - 40}
-                    height="6"
-                    fill="transparent"
-                    className="cursor-ns-resize"
-                    onMouseDown={(e) => handleMouseDown('bullish', 'top', e)}
-                  />
-                )}
-                {/* Bottom Drag Handle */}
-                {!readOnly && (
-                  <rect
-                    x="40"
-                    y={bullishYBottom - 3}
-                    width={1000 - paddingRight - 40}
-                    height="6"
-                    fill="transparent"
-                    className="cursor-ns-resize"
-                    onMouseDown={(e) => handleMouseDown('bullish', 'bottom', e)}
-                  />
-                )}
-                {/* Zone Label Badge (Bottom-Right inside zone) */}
-                <rect
-                  x={1000 - paddingRight - 150}
-                  y={bullishYTop + 4}
-                  width="142"
-                  height="20"
-                  rx="4"
-                  fill="#14532D"
-                  fillOpacity="0.85"
-                  stroke="#22C55E"
-                  strokeWidth="1"
-                />
-                <text
-                  x={1000 - paddingRight - 79}
-                  y={bullishYTop + 18}
-                  fill="#BBF7D0"
-                  fontSize="9.5"
-                  fontWeight="bold"
-                  textAnchor="middle"
-                  letterSpacing="0.5"
-                >
-                  BULLISH ZONE {bullishZone.from} - {bullishZone.to}
-                </text>
-              </g>
-            )}
-
-            {/* CANDLESTICKS */}
-            {candles.map((c, i) => {
-              const x = (i / candles.length) * (1000 - paddingRight - paddingLeft) + paddingLeft
-              const candleWidth = Math.max(3, (1000 - paddingRight) / candles.length - 3)
-
-              const yHigh = priceToY(c.high)
-              const yLow = priceToY(c.low)
-              const yOpen = priceToY(c.open)
-              const yClose = priceToY(c.close)
-
-              const rectY = Math.min(yOpen, yClose)
-              const rectHeight = Math.max(2, Math.abs(yClose - yOpen))
-              const color = c.isGreen ? '#22C55E' : '#EF4444'
-
-              return (
-                <g key={i} className="hover:opacity-80">
-                  {/* Upper/Lower Wick */}
-                  <line
-                    x1={x + candleWidth / 2}
-                    y1={yHigh}
-                    x2={x + candleWidth / 2}
-                    y2={yLow}
-                    stroke={color}
-                    strokeWidth="1.25"
-                  />
-                  {/* Real Body */}
-                  <rect
-                    x={x}
-                    y={rectY}
-                    width={candleWidth}
-                    height={rectHeight}
-                    fill={color}
-                    rx="1"
-                  />
-                </g>
-              )
-            })}
-
-            {/* CUSTOM USER DRAWINGS */}
-            {[...customDrawings, ...(currentDrawing ? [{ id: 'current', ...currentDrawing }] : [])].map((d) => {
+            {/* User Custom Drawings */}
+            {[...mappedDrawings, ...(currentDrawing ? [{ id: 'current', ...currentDrawing }] : [])].map((d) => {
               if (d.type === 'line') {
                 return (
-                  <line
-                    key={d.id}
-                    x1={d.x1}
-                    y1={d.y1}
-                    x2={d.x2}
-                    y2={d.y2}
-                    stroke="#6366F1"
-                    strokeWidth="2"
+                  <line key={d.id} x1={d.x1} y1={d.y1} x2={d.x2} y2={d.y2} stroke="#6366F1" strokeWidth="2"
+                    className="pointer-events-auto cursor-pointer"
                     onDoubleClick={() => !readOnly && setCustomDrawings(customDrawings.filter((p) => p.id !== d.id))}
-                    className={!readOnly ? 'cursor-pointer hover:stroke-indigo-400' : ''}
                   />
                 )
               } else if (d.type === 'zone') {
@@ -831,31 +471,16 @@ export default function InteractiveIndianChart({
                 const w = Math.abs(d.x2 - d.x1)
                 const h = Math.abs(d.y2 - d.y1)
                 return (
-                  <rect
-                    key={d.id}
-                    x={x}
-                    y={y}
-                    width={w}
-                    height={h}
-                    fill="#3B82F6"
-                    fillOpacity="0.2"
-                    stroke="#3B82F6"
-                    strokeWidth="1.5"
+                  <rect key={d.id} x={x} y={y} width={w} height={h} fill="#3B82F6" fillOpacity="0.2" stroke="#3B82F6" strokeWidth="1.5"
+                    className="pointer-events-auto cursor-pointer"
                     onDoubleClick={() => !readOnly && setCustomDrawings(customDrawings.filter((p) => p.id !== d.id))}
-                    className={!readOnly ? 'cursor-pointer hover:stroke-blue-400' : ''}
                   />
                 )
               } else if (d.type === 'text') {
                 return (
-                  <text
-                    key={d.id}
-                    x={d.x1}
-                    y={d.y1}
-                    fill="#E2E8F0"
-                    fontSize="12"
-                    fontWeight="bold"
+                  <text key={d.id} x={d.x1} y={d.y1} fill="#E2E8F0" fontSize="12" fontWeight="bold"
+                    className="pointer-events-auto cursor-pointer"
                     onDoubleClick={() => !readOnly && setCustomDrawings(customDrawings.filter((p) => p.id !== d.id))}
-                    className={!readOnly ? 'cursor-pointer hover:fill-indigo-400' : ''}
                   >
                     {d.text}
                   </text>
@@ -863,43 +488,6 @@ export default function InteractiveIndianChart({
               }
               return null
             })}
-
-            {/* CURRENT LIVE PRICE DASHED LINE */}
-            <line
-              x1="0"
-              y1={currentPriceY}
-              x2={1000 - paddingRight}
-              y2={currentPriceY}
-              stroke="#22C55E"
-              strokeWidth="1"
-              strokeDasharray="4 3"
-            />
-            {/* Live Price Tag on Axis */}
-            <rect
-              x={1000 - paddingRight}
-              y={currentPriceY - 9}
-              width="85"
-              height="18"
-              rx="3"
-              fill="#22C55E"
-            />
-            <text
-              x={1000 - paddingRight + 42}
-              y={currentPriceY + 3.5}
-              fill="#062812"
-              fontSize="10"
-              fontWeight="bold"
-              fontFamily="monospace"
-              textAnchor="middle"
-            >
-              {latestCandle.close.toFixed(2)}
-            </text>
-
-            {/* TradingView Logo Watermark (bottom-left) */}
-            <g transform={`translate(20, ${height - 45})`} opacity="0.4">
-              <rect width="24" height="24" rx="4" fill="#1E293B" />
-              <text x="5" y="16" fill="#94A3B8" fontSize="12" fontWeight="black">17</text>
-            </g>
           </svg>
         </div>
       </div>
