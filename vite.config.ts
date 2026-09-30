@@ -19,7 +19,7 @@ export default defineConfig({
         }
       },
       '/api/aliceblue': {
-        target: 'https://ant.aliceblueonline.com',
+        target: 'https://a3.aliceblueonline.com',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/aliceblue/, '')
       }

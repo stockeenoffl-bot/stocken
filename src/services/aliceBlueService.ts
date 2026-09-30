@@ -284,9 +284,10 @@ class AliceBlueService {
       return { success: false, error: 'Incomplete credentials. Please provide User ID and App ID.' }
     }
 
-    // 1. Try secure backend serverless endpoint (/api/broker)
+    // 1. Try secure backend serverless endpoint (/api/broker) if not in development
     try {
-      const res = await fetch('/api/broker', {
+      if (typeof import.meta !== 'undefined' && import.meta.env && !import.meta.env.DEV) {
+        const res = await fetch('/api/broker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,6 +307,7 @@ class AliceBlueService {
             lastError: undefined,
           })
           return { success: true, token: data.token }
+          }
         }
       }
     } catch (_) {
@@ -442,13 +444,13 @@ class AliceBlueService {
     
     if (params.symbol === 'NIFTY 50') {
       token = '26000'
-      exchangeStr = 'NSE::index'
+      exchangeStr = 'NSE'
     } else if (params.symbol === 'SENSEX') {
       token = '1' // General BSE index token, may need verification
-      exchangeStr = 'BSE::index'
+      exchangeStr = 'BSE'
     } else if (params.symbol === 'BANKNIFTY') {
       token = '26009'
-      exchangeStr = 'NSE::index'
+      exchangeStr = 'NSE'
     }
 
     if (!token) return []
@@ -539,12 +541,9 @@ class AliceBlueService {
         this.ws.onopen = async () => {
           console.log('[AliceBlue WS] Connected')
           
-          // Compute token per documentation
-          const hash1 = await this.computeSha256Checksum(creds.sessionToken!)
-          const hash2 = await this.computeSha256Checksum(hash1)
-          
+          // Connect with raw session token
           const connectPayload = {
-            susertoken: hash2,
+            susertoken: creds.sessionToken,
             t: 'c',
             actid: `${creds.userId}_API`,
             uid: `${creds.userId}_API`,
