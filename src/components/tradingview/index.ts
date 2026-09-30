@@ -1,4 +1,4 @@
-export { default as TradingViewTickerTape } from './TradingViewTickerTape'
+
 export { default as TradingViewMarketQuotes } from './TradingViewMarketQuotes'
 export { default as TradingViewTechnicalAnalysis } from './TradingViewTechnicalAnalysis'
 export { default as TradingViewStockHeatmap } from './TradingViewStockHeatmap'

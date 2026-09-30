@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { createChart, ColorType, IChartApi, ISeriesApi, Time, CandlestickData } from 'lightweight-charts'
+import { createChart, ColorType, CandlestickSeries, IChartApi, ISeriesApi, Time, CandlestickData } from 'lightweight-charts'
 import {
   Maximize2,
   Minimize2,
@@ -144,7 +144,7 @@ export default function InteractiveIndianChart({
       height: isFullscreen ? window.innerHeight - 50 : height - 50,
     })
 
-    const candlestickSeries = chart.addCandlestickSeries({
+    const candlestickSeries = chart.addSeries(CandlestickSeries, {
       upColor: '#22C55E',
       downColor: '#EF4444',
       borderVisible: false,
