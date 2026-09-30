@@ -454,7 +454,7 @@ class AliceBlueService {
     if (!token) return []
 
     try {
-      const response = await fetch('https://ant.aliceblueonline.com/open-api/od/ChartAPIService/api/chart/history', {
+      const response = await fetch('/api/aliceblue/open-api/od/ChartAPIService/api/chart/history', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -534,7 +534,7 @@ class AliceBlueService {
 
     return new Promise(async (resolve, reject) => {
       try {
-        this.ws = new WebSocket('wss://ws1.aliceblueonline.com/NorenWS')
+        this.ws = new WebSocket('wss://ws1.aliceblueonline.com/NorenWS/')
 
         this.ws.onopen = async () => {
           console.log('[AliceBlue WS] Connected')
