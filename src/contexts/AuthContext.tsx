@@ -8,7 +8,7 @@ export interface Profile {
   full_name: string | null
   display_name: string | null
   avatar_url: string | null
-  role: 'admin' | 'user'
+  role: 'super_admin' | 'admin' | 'analyst' | 'user'
   status: 'active' | 'inactive' | 'suspended' | 'banned' | 'pending'
 }
 
@@ -18,11 +18,13 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   isAdmin: boolean
+  isSuperAdmin: boolean
   isUser: boolean
   hasAdminAccess: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
   elevateToAdmin: () => void
+  elevateToSuperAdmin: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,11 +33,13 @@ const AuthContext = createContext<AuthContextType>({
   profile: null,
   loading: true,
   isAdmin: false,
+  isSuperAdmin: false,
   isUser: true,
   hasAdminAccess: false,
   signOut: async () => {},
   refreshProfile: async () => {},
   elevateToAdmin: () => {},
+  elevateToSuperAdmin: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -144,9 +148,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const isAdmin = Boolean(profile?.role === 'admin')
-  const isUser = Boolean(profile?.role === 'user' || !profile)
+  const isSuperAdmin = Boolean(profile?.role === 'super_admin')
+  const isAdmin = Boolean(profile && ['admin', 'super_admin', 'analyst'].includes(profile.role))
+  const isUser = Boolean(!profile || profile.role === 'user')
   const hasAdminAccess = isAdmin
+
+  const elevateToSuperAdmin = async () => {
+    await elevateToAdmin()
+  }
 
   const elevateToAdmin = async () => {
     if (user && profile) {
@@ -181,11 +190,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profile,
         loading,
         isAdmin,
+        isSuperAdmin,
         isUser,
         hasAdminAccess,
         signOut,
         refreshProfile,
         elevateToAdmin,
+        elevateToSuperAdmin,
       }}
     >
       {children}

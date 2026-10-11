@@ -86,6 +86,7 @@ export default function Sidebar({ isClient = false }: { isClient?: boolean }) {
       setBrokerConnected(aliceBlueService.isConfigured() && aliceBlueService.isSessionActive())
     }
     checkBroker()
+    void aliceBlueService.refreshStatus()
 
     const onStatusChange = () => checkBroker()
     window.addEventListener('aliceblue-status-change', onStatusChange)

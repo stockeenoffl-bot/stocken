@@ -153,7 +153,7 @@ export default function SebiDisclaimer() {
           </div>
           <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
             <p>
-              All materials published on Zonal Edge — including daily market structure analysis for NIFTY 50 and SENSEX, supply and demand zones, Open Interest (OI) heatmaps, candlestick charting patterns, invalidation levels, live TradingView charts, and educational modules — are developed solely for <strong>educational, informational, and theoretical study purposes</strong>.
+              All materials published on Zonal Edge — including daily market structure analysis for NIFTY 50 and SENSEX, supply and demand zones, Open Interest (OI) heatmaps, candlestick charting patterns, invalidation levels, live market charts, and educational modules — are developed solely for <strong>educational, informational, and theoretical study purposes</strong>.
             </p>
             <p>
               Any price levels, support/resistance zones, or directional biases discussed on the platform represent historical market structure analysis and mathematical models. They should never be treated as trading tips, buy/sell signals, or solicitation to invest capital.

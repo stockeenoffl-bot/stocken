@@ -48,8 +48,8 @@ export default function ContactUs() {
       a: 'Daily market structure analysis for NIFTY 50 and SENSEX is published before the market opens, usually by 8:30 AM IST on every Indian trading day.',
     },
     {
-      q: 'Can I draw and save my markings on the live TradingView chart?',
-      a: 'Yes! The integrated TradingView chart has full left-side drawing toolbars enabled. You can draw supply/demand zones, trendlines, and Fibonacci levels, and take screenshots using the camera icon in the top-right toolbar.',
+      q: 'Can I draw on the live chart?',
+      a: 'Charts are view-only for subscribers. Our analysts draw the supply/demand zones, trendlines and levels and publish them live, so you always see the latest official analysis in real time.',
     },
     {
       q: 'How do I cancel my 7-day trial or active subscription?',

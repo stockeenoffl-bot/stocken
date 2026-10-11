@@ -13,7 +13,7 @@ import {
   ExternalLink,
   ShieldCheck,
 } from 'lucide-react'
-import { aliceBlueService, type AliceBlueCredentials } from '@/services/aliceBlueService'
+import { aliceBlueService, type GatewayStatus } from '@/services/aliceBlueService'
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -38,21 +38,15 @@ export default function Security() {
   })
   const [toastMessage, setToastMessage] = useState('')
 
-  // Broker API credentials state
-  const [brokerCreds, setBrokerCreds] = useState<AliceBlueCredentials>({
-    userId: '',
-    appId: '',
-    apiSecret: '',
-    ipAddress: '',
-    environment: 'live',
-    dataFeedEnabled: true,
-  })
-  const [detectingIp, setDetectingIp] = useState(false)
-  const [generatingToken, setGeneratingToken] = useState(false)
+  // Broker connection status (credentials & session live on the server)
+  const [brokerStatus, setBrokerStatus] = useState<GatewayStatus | null>(aliceBlueService.getStatus())
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
-    const loaded = aliceBlueService.loadCredentials()
-    if (loaded) setBrokerCreds(loaded)
+    void aliceBlueService.refreshStatus().then((st) => st && setBrokerStatus(st))
+    const onChange = () => setBrokerStatus(aliceBlueService.getStatus())
+    window.addEventListener('aliceblue-status-change', onChange)
+    return () => window.removeEventListener('aliceblue-status-change', onChange)
   }, [])
 
   const handleSave = (msg: string) => {
@@ -60,37 +54,14 @@ export default function Security() {
     setTimeout(() => setToastMessage(''), 3000)
   }
 
-  const handleSaveBrokerCreds = () => {
-    aliceBlueService.saveCredentials(brokerCreds)
-    handleSave('Alice Blue broker credentials updated successfully!')
-  }
-
-  const handleDetectIp = async () => {
-    setDetectingIp(true)
+  const handleRefreshStatus = async () => {
+    setRefreshing(true)
     try {
-      const ip = await aliceBlueService.detectPublicIp()
-      if (ip) {
-        setBrokerCreds((prev) => ({ ...prev, ipAddress: ip }))
-        handleSave(`Detected IPv4: ${ip}`)
-      }
+      const st = await aliceBlueService.refreshStatus()
+      if (st) setBrokerStatus(st)
+      handleSave('Broker status refreshed')
     } finally {
-      setDetectingIp(false)
-    }
-  }
-
-  const handleGenerateToken = async () => {
-    setGeneratingToken(true)
-    try {
-      const res = await aliceBlueService.generateSession()
-      if (res.success) {
-        const loaded = aliceBlueService.loadCredentials()
-        if (loaded) setBrokerCreds(loaded)
-        handleSave('Active session token generated!')
-      } else {
-        handleSave('Error: ' + (res.error || 'Failed to generate token'))
-      }
-    } finally {
-      setGeneratingToken(false)
+      setRefreshing(false)
     }
   }
 
@@ -179,94 +150,40 @@ export default function Security() {
                 </Link>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Client Code / User ID</label>
-                  <input
-                    type="text"
-                    value={brokerCreds.userId}
-                    onChange={(e) => setBrokerCreds({ ...brokerCreds, userId: e.target.value.toUpperCase().trim() })}
-                    placeholder="e.g. AB123456"
-                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
-                  />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                  <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Server keys</span>
+                  <span className={`text-xs font-bold ${brokerStatus?.configured ? 'text-emerald-400' : 'text-rose-400'}`}>
+                    {brokerStatus?.configured ? 'Configured' : 'Missing'}
+                  </span>
                 </div>
-
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">App ID (API Key)</label>
-                  <input
-                    type="text"
-                    value={brokerCreds.appId}
-                    onChange={(e) => setBrokerCreds({ ...brokerCreds, appId: e.target.value.trim() })}
-                    placeholder="App ID from a3.aliceblueonline.com"
-                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
-                  />
+                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                  <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Live session</span>
+                  <span className={`text-xs font-bold ${brokerStatus?.connected ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {brokerStatus?.connected ? 'Active' : 'Login needed'}
+                  </span>
                 </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">API Secret</label>
-                  <input
-                    type="password"
-                    value={brokerCreds.apiSecret}
-                    onChange={(e) => setBrokerCreds({ ...brokerCreds, apiSecret: e.target.value.trim() })}
-                    placeholder="Confidential API Secret Key"
-                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
-                  />
-                </div>
-
-                <div className="space-y-1.5 sm:col-span-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-semibold text-[var(--text-primary)]">Registered IPv4 Address</label>
-                    <button
-                      type="button"
-                      onClick={handleDetectIp}
-                      disabled={detectingIp}
-                      className="text-[10px] text-[var(--accent-indigo)] hover:underline flex items-center gap-1"
-                    >
-                      <RefreshCw size={10} className={detectingIp ? 'animate-spin' : ''} />
-                      {detectingIp ? 'Detecting...' : 'Detect Public IP'}
-                    </button>
-                  </div>
-                  <input
-                    type="text"
-                    value={brokerCreds.ipAddress}
-                    onChange={(e) => setBrokerCreds({ ...brokerCreds, ipAddress: e.target.value.trim() })}
-                    placeholder="e.g. 103.21.244.10"
-                    className="w-full px-3 py-2 rounded-md border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
-                  />
-                  <p className="text-[10px] text-[var(--text-muted)]">
-                    Alice Blue requires your ISP static IPv4 address. Orders will not execute unless the IP is approved in the A3 portal.
-                  </p>
+                <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
+                  <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Registered IP</span>
+                  <span className="text-xs font-mono font-bold text-[var(--text-primary)]">{brokerStatus?.ipAddress || '—'}</span>
                 </div>
               </div>
 
-              {/* Active Session & Actions */}
               <div className="p-4 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div>
-                  <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1">
-                    <Zap size={14} className="text-amber-400" />
-                    Daily Session Token
+                <div className="text-[11px] text-[var(--text-muted)] max-w-xl">
+                  <span className="text-xs font-bold text-[var(--text-primary)] flex items-center gap-1 mb-0.5">
+                    <Zap size={14} className="text-amber-400" /> Keys are stored on the server only
                   </span>
-                  <span className="text-[10px] text-[var(--text-muted)] mt-0.5 block font-mono truncate max-w-sm">
-                    {brokerCreds.sessionToken || 'No active session token'}
-                  </span>
+                  The API secret and daily session are never sent to browsers. Set <code>ALICE_BLUE_APP_ID</code>, <code>ALICE_BLUE_API_SECRET</code> and <code>SUPABASE_SERVICE_ROLE_KEY</code> in your hosting environment, then log in daily on the Broker Hub.
                 </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGenerateToken}
-                    disabled={generatingToken}
-                    className="px-3 py-1.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-xs font-semibold hover:border-[var(--accent-indigo)] text-[var(--text-primary)] transition-all"
-                  >
-                    {generatingToken ? 'Generating...' : 'Generate Today\'s Session'}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleSaveBrokerCreds}
-                    className="px-4 py-1.5 rounded bg-[var(--accent-indigo)] text-white text-xs font-bold hover:brightness-110 transition-all"
-                  >
-                    Save Broker Keys
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={handleRefreshStatus}
+                  disabled={refreshing}
+                  className="px-3 py-1.5 rounded bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-xs font-semibold hover:border-[var(--accent-indigo)] text-[var(--text-primary)] transition-all flex items-center gap-1.5"
+                >
+                  <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} /> Refresh status
+                </button>
               </div>
             </div>
           )}

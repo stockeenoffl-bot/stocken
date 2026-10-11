@@ -1,4 +1,12 @@
+// Live sync: admin publishes -> Supabase `live_state` -> pushed to EVERY user via Realtime.
+//
+//  * Source of truth is the database (not the admin's browser), so users on other
+//    devices/browsers get updates, and new visitors load the latest published state.
+//  * Realtime push (~1s) + 15s polling safety net + refetch when a tab becomes visible.
+//  * localStorage mirror makes first paint instant and works offline.
 import { supabase } from '@/lib/supabase'
+import type { ChartDrawing } from '@/types/chart'
+import type { RangeKey, Timeframe } from '@/lib/candles'
 
 export interface LiveMarketData {
   market: string
@@ -9,6 +17,7 @@ export interface LiveMarketData {
   resistanceZone: { from: number; to: number }
   bullishZone?: { from: number; to: number }
   bearishZone?: { from: number; to: number }
+  liquidityZone?: { from: number; to: number }
   biasStatement?: string
   sessions?: {
     asian: 'Bullish' | 'Bearish' | 'Neutral'
@@ -18,6 +27,12 @@ export interface LiveMarketData {
   target1?: number | string
   target2?: number | string
   notes?: string
+  /** Admin's chart annotations, shown read-only to users. */
+  drawings?: ChartDrawing[]
+  /** The chart view the admin wants users to see by default. */
+  chartTimeframe?: Timeframe
+  chartRange?: RangeKey
+  published?: boolean
   lastUpdated: number
   publishedAtFormatted?: string
   updatedBy?: string
@@ -33,141 +48,156 @@ export interface FlashAlert {
   active: boolean
 }
 
-const STORAGE_KEY_MARKETS = 'zonal_edge_live_market_data_v2'
-const STORAGE_KEY_ALERT = 'zonal_edge_live_flash_alert_v2'
-const STORAGE_KEY_CHART = 'zonal_edge_chart_config'
-const CHANNEL_NAME = 'zonal_edge_broadcast_sync'
+const CACHE_KEY = 'zonal_edge_live_state_v3'
+const ALERT_KEY = 'alert'
+const marketKey = (m: string) => `market:${m}`
 
-export interface ChartConfig {
-  symbol: string
-  interval: string
-  updatedAt: number
-}
+const emptyMarket = (market: string): LiveMarketData => ({
+  market,
+  bias: 'neutral',
+  summary: 'Waiting for the admin to publish today\'s analysis.',
+  invalidationLevel: '-',
+  supportZone: { from: 0, to: 0 },
+  resistanceZone: { from: 0, to: 0 },
+  lastUpdated: 0,
+  published: false,
+})
 
-const DEFAULT_CHART_CONFIG: ChartConfig = {
-  symbol: 'BSE:SENSEX',
-  interval: '15',
-  updatedAt: Date.now()
-}
-
-// Default baseline data for primary Indian markets
-const DEFAULT_MARKET_DATA: Record<string, LiveMarketData> = {
-  'NIFTY 50': {
-    market: 'NIFTY 50',
-    bias: 'bullish',
-    summary: 'Bullish above 24,220. Liquidity sweep below previous swing low followed by strong rejection.',
-    biasStatement: 'Bullish above 24,220',
-    invalidationLevel: 24100,
-    supportZone: { from: 24050, to: 24150 },
-    resistanceZone: { from: 24420, to: 24520 },
-    bullishZone: { from: 24050, to: 24150 },
-    bearishZone: { from: 24420, to: 24520 },
-    sessions: {
-      asian: 'Neutral',
-      london: 'Bullish',
-      newYork: 'Volatile',
-    },
-    target1: 24420,
-    target2: 24520,
-    notes:
-      'Liquidity sweep below previos swing low followed by strong rejection.\nExpect bullish momentum if 24,220 holds.\nWatch reaction near bearish zone for reversal signs.',
-    lastUpdated: Date.now(),
-    publishedAtFormatted: '22 Sept 2026, 20:55 IST',
-    updatedBy: 'Barath',
-    publishedByRole: 'Super Admin',
-  },
-  'SENSEX': {
-    market: 'SENSEX',
-    bias: 'bullish',
-    summary: 'Strong buying interest seen around 79,200 support. Upside rally intact.',
-    invalidationLevel: 78950,
-    supportZone: { from: 79000, to: 79200 },
-    resistanceZone: { from: 79650, to: 79800 },
-    target1: 79600,
-    target2: 80000,
-    notes: 'Banking & IT heavyweights supporting the index.',
-    lastUpdated: Date.now(),
-    updatedBy: 'Super Admin',
-  },
-  'BANKNIFTY': {
-    market: 'BANKNIFTY',
-    bias: 'neutral',
-    summary: 'Range-bound between 51,100 and 51,500. Wait for clear breakout before entry.',
-    invalidationLevel: 50900,
-    supportZone: { from: 51000, to: 51200 },
-    resistanceZone: { from: 51500, to: 51650 },
-    target1: 51750,
-    target2: 52000,
-    notes: 'Private bank earnings in focus. Manage tight stop-losses.',
-    lastUpdated: Date.now(),
-    updatedBy: 'Super Admin',
-  },
-  'FINNIFTY': {
-    market: 'FINNIFTY',
-    bias: 'bullish',
-    summary: 'Holding above 23,900. Upside target 24,100 active.',
-    invalidationLevel: 23850,
-    supportZone: { from: 23880, to: 23930 },
-    resistanceZone: { from: 24050, to: 24120 },
-    target1: 24080,
-    target2: 24150,
-    notes: 'Expiry trading: favorable risk-reward on pullbacks.',
-    lastUpdated: Date.now(),
-    updatedBy: 'Super Admin',
-  },
-}
+type Row = { key: string; value: any; updated_at: string; updated_by: string | null }
 
 class BroadcastSyncService {
-  private channel: BroadcastChannel | null = null
-  private listeners: Set<() => void> = new Set()
+  private markets: Record<string, LiveMarketData> = {}
+  private alert: FlashAlert | null = null
+  private listeners = new Set<() => void>()
+  private started = false
+  private ready = false
+  private channelRef: ReturnType<typeof supabase.channel> | null = null
+  private pollTimer: ReturnType<typeof setInterval> | null = null
 
   constructor() {
-    this.initChannel()
-  }
-
-  private initChannel() {
-    if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
-      try {
-        this.channel = new BroadcastChannel(CHANNEL_NAME)
-        this.channel.onmessage = (event) => {
-          if (
-            event.data?.type === 'MARKET_DATA_UPDATED' || 
-            event.data?.type === 'FLASH_ALERT_UPDATED' ||
-            event.data?.type === 'CHART_CONFIG_UPDATED'
-          ) {
-            this.notifyListeners()
-          }
-        }
-      } catch (e) {
-        console.warn('[SyncService] BroadcastChannel unavailable, using window events fallback')
-      }
-    }
-
+    this.readCache()
     if (typeof window !== 'undefined') {
-      window.addEventListener('storage', (e) => {
-        if (e.key === STORAGE_KEY_MARKETS || e.key === STORAGE_KEY_ALERT || e.key === STORAGE_KEY_CHART) {
-          this.notifyListeners()
-        }
-      })
+      setTimeout(() => this.start(), 0)
     }
   }
 
-  private notifyListeners() {
-    this.listeners.forEach((fn) => {
-      try {
-        fn()
-      } catch (e) {
-        console.error('[SyncService] Error executing listener:', e)
+  // ------------------------------ lifecycle ------------------------------
+  private start() {
+    if (this.started) return
+    this.started = true
+    void this.refresh()
+
+    try {
+      this.channelRef = supabase
+        .channel('live_state_changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'live_state' }, (payload: any) => {
+          if (payload.eventType === 'DELETE') {
+            const key = payload.old?.key
+            if (key) this.applyRow({ key, value: null, updated_at: new Date().toISOString(), updated_by: null }, true)
+          } else if (payload.new) {
+            this.applyRow(payload.new as Row, true)
+          }
+        })
+        .subscribe()
+    } catch (e) {
+      console.warn('[LiveSync] Realtime unavailable, using polling only', e)
+    }
+
+    this.pollTimer = setInterval(() => void this.refresh(), 15000)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) void this.refresh()
+    })
+    window.addEventListener('online', () => void this.refresh())
+    window.addEventListener('storage', (e) => {
+      if (e.key === CACHE_KEY) {
+        this.readCache()
+        this.notify()
       }
     })
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('zonal_edge_sync_change'))
+  }
+
+  private readCache() {
+    try {
+      const raw = localStorage.getItem(CACHE_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      this.markets = parsed.markets || {}
+      this.alert = parsed.alert || null
+    } catch { /* ignore */ }
+  }
+
+  private writeCache() {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ markets: this.markets, alert: this.alert }))
+    } catch { /* quota */ }
+  }
+
+  private notify() {
+    this.listeners.forEach((fn) => {
+      try { fn() } catch (e) { console.error('[LiveSync] listener error', e) }
+    })
+    window.dispatchEvent(new CustomEvent('zonal_edge_sync_change'))
+  }
+
+  /** Fetch the latest published state from the database. */
+  public async refresh(): Promise<void> {
+    try {
+      const { data, error } = await supabase.from('live_state').select('key,value,updated_at,updated_by')
+      if (error) throw error
+      let changed = !this.ready
+      const seen = new Set<string>()
+      for (const row of (data || []) as Row[]) {
+        seen.add(row.key)
+        if (this.applyRow(row, false)) changed = true
+      }
+      // Rows deleted server side (e.g. alert cleared)
+      if (!seen.has(ALERT_KEY) && this.alert) {
+        this.alert = null
+        changed = true
+      }
+      this.ready = true
+      if (changed) {
+        this.writeCache()
+        this.notify()
+      }
+    } catch (e) {
+      // Table missing / offline: keep whatever we have (cache)
+      if (!this.ready) console.warn('[LiveSync] Could not load live_state. Run supabase_live_sync.sql.', e)
     }
   }
 
-  /**
-   * Subscribe component to real-time live data updates
-   */
+  private applyRow(row: Row, notifyNow: boolean): boolean {
+    let changed = false
+    if (row.key === ALERT_KEY) {
+      const next = row.value && Object.keys(row.value).length ? (row.value as FlashAlert) : null
+      if (JSON.stringify(next) !== JSON.stringify(this.alert)) {
+        this.alert = next
+        changed = true
+      }
+    } else if (row.key.startsWith('market:')) {
+      const name = row.key.slice(7)
+      if (!row.value) {
+        if (this.markets[name]) {
+          delete this.markets[name]
+          changed = true
+        }
+      } else {
+        const next = { ...emptyMarket(name), ...row.value, market: name } as LiveMarketData
+        const prev = this.markets[name]
+        if (!prev || prev.lastUpdated !== next.lastUpdated || JSON.stringify(prev) !== JSON.stringify(next)) {
+          this.markets[name] = next
+          changed = true
+        }
+      }
+    }
+    if (changed && notifyNow) {
+      this.writeCache()
+      this.notify()
+    }
+    return changed
+  }
+
+  // ------------------------------ subscribe ------------------------------
   public subscribe(callback: () => void): () => void {
     this.listeners.add(callback)
     return () => {
@@ -175,207 +205,72 @@ class BroadcastSyncService {
     }
   }
 
-  /**
-   * Get all live market states
-   */
+  public isReady() {
+    return this.ready
+  }
+
+  // ------------------------------ read ------------------------------
   public getAllMarkets(): Record<string, LiveMarketData> {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_MARKETS)
-      if (stored) {
-        return { ...DEFAULT_MARKET_DATA, ...JSON.parse(stored) }
-      }
-    } catch (e) {
-      console.warn('[SyncService] Error parsing market data:', e)
-    }
-    return DEFAULT_MARKET_DATA
+    return this.markets
   }
 
-  /**
-   * Get live market state for a specific symbol (e.g. 'NIFTY 50')
-   */
   public getMarketData(market: string): LiveMarketData {
-    const all = this.getAllMarkets()
-    return all[market] || DEFAULT_MARKET_DATA[market] || {
-      market,
-      bias: 'neutral',
-      summary: 'Market analysis pending.',
-      invalidationLevel: '-',
-      supportZone: { from: 0, to: 0 },
-      resistanceZone: { from: 0, to: 0 },
-      lastUpdated: Date.now(),
-      updatedBy: 'Super Admin',
-    }
+    return this.markets[market] || emptyMarket(market)
   }
 
-  /**
-   * Super Admin Method: Update and Broadcast Market Bias & Levels to ALL users
-   */
+  public getUrgentAlert(): FlashAlert | null {
+    const a = this.alert
+    if (a && a.active && Date.now() - a.timestamp < 12 * 60 * 60 * 1000) return a
+    return null
+  }
+
+  // ------------------------------ admin write ------------------------------
+  private async write(key: string, value: any, author: string) {
+    const { error } = await supabase
+      .from('live_state')
+      .upsert({ key, value, updated_at: new Date().toISOString(), updated_by: author }, { onConflict: 'key' })
+    if (error) throw new Error(`Could not publish to users: ${error.message}. Make sure supabase_live_sync.sql has been run and you are logged in as admin.`)
+  }
+
+  /** Admin only (enforced by RLS): publish a market update to every user. */
   public async broadcastMarketUpdate(
     market: string,
     update: Partial<LiveMarketData>,
-    authorName = 'Super Admin'
+    authorName = 'Admin'
   ): Promise<LiveMarketData> {
-    const all = this.getAllMarkets()
-    const current = all[market] || DEFAULT_MARKET_DATA[market] || {
-      market,
-      bias: 'neutral',
-      summary: '',
-      invalidationLevel: '-',
-      supportZone: { from: 0, to: 0 },
-      resistanceZone: { from: 0, to: 0 },
-      lastUpdated: Date.now(),
-    }
-
+    const current = this.getMarketData(market)
     const updated: LiveMarketData = {
       ...current,
       ...update,
       market,
+      published: true,
       lastUpdated: Date.now(),
       updatedBy: authorName,
     }
-
-    all[market] = updated
-
-    // 1. Save to local storage for instant access across tabs
-    try {
-      localStorage.setItem(STORAGE_KEY_MARKETS, JSON.stringify(all))
-    } catch (e) {
-      console.error('[SyncService] LocalStorage error:', e)
-    }
-
-    // 2. Broadcast to all open tabs via BroadcastChannel & events
-    if (this.channel) {
-      this.channel.postMessage({ type: 'MARKET_DATA_UPDATED', market, data: updated })
-    }
-    this.notifyListeners()
-
-    // 3. Best-effort async save to Supabase analyses for remote persistence
-    try {
-      // Find market_id in Supabase
-      const { data: mData } = await supabase.from('markets').select('id').eq('name', market).single()
-      if (mData?.id) {
-        await supabase.from('analyses').upsert(
-          {
-            market_id: mData.id,
-            title: `${market} Live Market Bias Update`,
-            analysis_date: new Date().toISOString().split('T')[0],
-            overall_bias: updated.bias,
-            invalidation_level: typeof updated.invalidationLevel === 'number' ? updated.invalidationLevel : null,
-            summary: updated.summary,
-            detailed_notes: updated.notes || '',
-            status: 'published',
-            visibility: 'free',
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: 'market_id' }
-        )
-      }
-    } catch (err) {
-      console.warn('[SyncService] Supabase sync completed with local broadcast fallback')
-    }
-
+    await this.write(marketKey(market), updated, authorName)
+    this.markets[market] = updated
+    this.writeCache()
+    this.notify()
     return updated
   }
 
-  /**
-   * Super Admin Method: Broadcast Urgent Alert Banner to all users
-   */
-  public broadcastUrgentAlert(alert: Omit<FlashAlert, 'id' | 'timestamp' | 'active'>): FlashAlert {
-    const fullAlert: FlashAlert = {
-      ...alert,
-      id: `ALERT_${Date.now()}`,
-      timestamp: Date.now(),
-      active: true,
-    }
-
-    try {
-      localStorage.setItem(STORAGE_KEY_ALERT, JSON.stringify(fullAlert))
-    } catch (e) {}
-
-    if (this.channel) {
-      this.channel.postMessage({ type: 'FLASH_ALERT_UPDATED', alert: fullAlert })
-    }
-    this.notifyListeners()
-
-    // Optional: send to Supabase notifications table as broadcast
-    try {
-      supabase.from('notifications').insert({
-        user_id: 'all',
-        title: fullAlert.title,
-        message: fullAlert.message,
-        type: fullAlert.severity,
-        is_read: false,
-      }).then(() => {})
-    } catch (_) {}
-
-    return fullAlert
+  public async broadcastUrgentAlert(
+    alert: Omit<FlashAlert, 'id' | 'timestamp' | 'active'>,
+    authorName = 'Admin'
+  ): Promise<FlashAlert> {
+    const full: FlashAlert = { ...alert, id: `ALERT_${Date.now()}`, timestamp: Date.now(), active: true }
+    await this.write(ALERT_KEY, full, authorName)
+    this.alert = full
+    this.writeCache()
+    this.notify()
+    return full
   }
 
-  /**
-   * Dismiss or clear the active flash alert
-   */
-  public clearUrgentAlert(): void {
-    try {
-      localStorage.removeItem(STORAGE_KEY_ALERT)
-    } catch (e) {}
-
-    if (this.channel) {
-      this.channel.postMessage({ type: 'FLASH_ALERT_UPDATED', alert: null })
-    }
-    this.notifyListeners()
-  }
-
-  /**
-   * Get current active flash alert
-   */
-  public getUrgentAlert(): FlashAlert | null {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_ALERT)
-      if (stored) {
-        const alert: FlashAlert = JSON.parse(stored)
-        // Auto-expire alerts after 12 hours
-        if (alert.active && Date.now() - alert.timestamp < 12 * 60 * 60 * 1000) {
-          return alert
-        }
-      }
-    } catch (e) {}
-    return null
-  }
-
-  /**
-   * Get the current active chart config
-   */
-  public getChartConfig(): ChartConfig {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY_CHART)
-      if (stored) {
-        return JSON.parse(stored)
-      }
-    } catch (e) {}
-    return DEFAULT_CHART_CONFIG
-  }
-
-  /**
-   * Super Admin Method: Broadcast chart symbol and timeframe change
-   */
-  public broadcastChartConfig(config: Partial<ChartConfig>): ChartConfig {
-    const current = this.getChartConfig()
-    const updated = {
-      ...current,
-      ...config,
-      updatedAt: Date.now()
-    }
-
-    try {
-      localStorage.setItem(STORAGE_KEY_CHART, JSON.stringify(updated))
-    } catch (e) {}
-
-    if (this.channel) {
-      this.channel.postMessage({ type: 'CHART_CONFIG_UPDATED', config: updated })
-    }
-    this.notifyListeners()
-    
-    return updated
+  public async clearUrgentAlert(authorName = 'Admin'): Promise<void> {
+    await this.write(ALERT_KEY, {}, authorName)
+    this.alert = null
+    this.writeCache()
+    this.notify()
   }
 }
 

@@ -117,7 +117,7 @@ export default function AboutUs() {
                 'Daily institutional supply & demand zones for NIFTY 50 and SENSEX',
                 'Clear directional bias statements so you know who controls the session',
                 'Strict invalidation levels so you know exactly when your setup is negated',
-                'Interactive live TradingView chart with full drawing and marking tools',
+                'Real-time Alice Blue charts with analyst-published zones and levels',
                 'Live Open Interest (OI) analysis tracking real institutional positioning',
                 'Zero buy/sell spam, zero emotional gambling, 100% structured logic',
               ].map((point, i) => (
@@ -184,17 +184,17 @@ export default function AboutUs() {
           </div>
         </div>
 
-        {/* Feature Highlights: Live TradingView Chart */}
+        {/* Feature Highlights: Live Alice Blue Chart */}
         <div className="p-8 rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-tertiary)] flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="space-y-3 max-w-xl">
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-[var(--accent-indigo)] border border-indigo-500/20">
               <LineChart size={13} /> Live Technical Charting
             </div>
             <h3 className="text-2xl font-bold text-[var(--text-primary)]">
-              Draw, Mark, and Analyze on Live TradingView Charts
+              Live Alice Blue Charts with Analyst-Published Zones
             </h3>
             <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
-              Zonal Edge integrates official TradingView real-time charting with full left-side drawing toolbars. Mark your own supply/demand zones, draw trendlines, calculate Fibonacci ratios, and apply technical indicators on live streaming NSE/BSE feeds.
+              Zonal Edge streams real-time NSE/BSE candles from Alice Blue across every timeframe. Our analysts mark supply/demand zones, trendlines and invalidation levels, and every update reaches all subscribers instantly.
             </p>
           </div>
           <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">

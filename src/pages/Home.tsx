@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
   TrendingUp,
@@ -9,19 +9,16 @@ import {
   Lock,
   Megaphone,
   Radio,
-  Sparkles,
   X,
   Clock,
   ShieldCheck,
 } from 'lucide-react'
-import CandlestickChart from '@/components/charts/CandlestickChart'
-import InteractiveIndianChart, { type ZoneDefinition } from '@/components/charts/InteractiveIndianChart'
+import LiveChart from '@/components/charts/LiveChart'
 import StatCard from '@/components/StatCard'
-import { Globe, Calendar, RotateCcw } from 'lucide-react'
+import { Globe } from 'lucide-react'
 import { useMarket } from '@/contexts/MarketContext'
-import { analysisService } from '@/services/analysisService'
 import { useAuth } from '@/contexts/AuthContext'
-import { broadcastSyncService, type LiveMarketData, type FlashAlert } from '@/services/broadcastSyncService'
+import { useLiveMarket } from '@/hooks/useLiveMarket'
 import { Link } from 'react-router-dom'
 
 const containerVariants = {
@@ -37,65 +34,17 @@ const itemVariants = {
 export default function Home() {
   const { market } = useMarket()
   const { profile, isSuperAdmin, isAdmin } = useAuth()
-  const [analyses, setAnalyses] = useState<any[]>([])
 
+  // Everything below comes from what the admin published (database + realtime push)
+  const { data: liveData, alert, justUpdated, ready } = useLiveMarket(market)
+  const [dismissedAlert, setDismissedAlert] = useState<string | null>(null)
+  const flashAlert = alert && alert.id !== dismissedAlert ? alert : null
 
-  // Real-Time Live Synced Market Data from Super Admin
-  const [liveData, setLiveData] = useState<LiveMarketData>(broadcastSyncService.getMarketData(market))
-  const [flashAlert, setFlashAlert] = useState<FlashAlert | null>(broadcastSyncService.getUrgentAlert())
-  const [justUpdated, setJustUpdated] = useState(false)
-
-  // User-editable zones on Free Plan
-  const [customBullish, setCustomBullish] = useState<ZoneDefinition>({
-    from: liveData.bullishZone?.from || liveData.supportZone?.from || 24050,
-    to: liveData.bullishZone?.to || liveData.supportZone?.to || 24150,
-  })
-  const [customBearish, setCustomBearish] = useState<ZoneDefinition>({
-    from: liveData.bearishZone?.from || liveData.resistanceZone?.from || 24420,
-    to: liveData.bearishZone?.to || liveData.resistanceZone?.to || 24520,
-  })
-
-  useEffect(() => {
-    const b = liveData.bullishZone || liveData.supportZone || { from: 24050, to: 24150 }
-    const r = liveData.bearishZone || liveData.resistanceZone || { from: 24420, to: 24520 }
-    setCustomBullish(b)
-    setCustomBearish(r)
-  }, [market, liveData.lastUpdated])
-
-  useEffect(() => {
-    async function loadAnalyses() {
-      try {
-        const data = await analysisService.getPublishedAnalyses()
-        setAnalyses(data || [])
-      } catch (err) {
-        console.error('Failed to load analyses', err)
-      }
-    }
-    loadAnalyses()
-
-    // Sync with Broadcast Service in Real-Time
-    const initialData = broadcastSyncService.getMarketData(market)
-    setLiveData(initialData)
-    setFlashAlert(broadcastSyncService.getUrgentAlert())
-
-    const unsubscribe = broadcastSyncService.subscribe(() => {
-      const updated = broadcastSyncService.getMarketData(market)
-      setLiveData(updated)
-      setFlashAlert(broadcastSyncService.getUrgentAlert())
-      setJustUpdated(true)
-      setTimeout(() => setJustUpdated(false), 3000)
-    })
-
-    return () => unsubscribe()
-  }, [market])
-
-  const currentAnalysis = analyses.find((a) => a.markets?.name === market)
   const isPro = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const published = Boolean(liveData.published)
 
-  // Effective values prioritized by Super Admin Live Broadcast
-  const effectiveBias = liveData.bias || currentAnalysis?.overall_bias || 'neutral'
-  const effectiveSummary = liveData.summary || currentAnalysis?.summary || 'Market consolidation observed.'
-  const effectiveInvalidation = String(liveData.invalidationLevel || currentAnalysis?.invalidation_level || '-')
+  const effectiveBias = liveData.bias || 'neutral'
+  const effectiveInvalidation = String(liveData.invalidationLevel || '-')
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-5">
@@ -129,7 +78,7 @@ export default function Home() {
               </div>
             </div>
             <button
-              onClick={() => setFlashAlert(null)}
+              onClick={() => setDismissedAlert(flashAlert.id)}
               className="p-1 rounded text-[var(--text-muted)] hover:text-white hover:bg-white/10 transition-colors"
               title="Dismiss Alert"
             >
@@ -216,57 +165,46 @@ export default function Home() {
               </span>
             </div>
             <p className="text-slate-300 text-[11px] mt-0.5">
-              Published by <strong className="text-white">{liveData.updatedBy || 'Barath (Super Admin)'}</strong> &middot; Real-time zones displayed below
+              {published ? (
+                <>Published by <strong className="text-white">{liveData.updatedBy || 'Admin'}</strong> &middot; Updates appear here automatically</>
+              ) : ready ? (
+                <>No analysis published yet for {market}. It will appear here the moment the admin publishes.</>
+              ) : (
+                <>Loading latest analysis…</>
+              )}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2 text-slate-400 font-mono text-[11px]">
           <Clock size={13} className="text-indigo-400" />
-          <span>Published: <strong className="text-indigo-200">{liveData.publishedAtFormatted || '22 Sept 2026, 20:55 IST'}</strong></span>
+          <span>Published: <strong className="text-indigo-200">{liveData.publishedAtFormatted || '—'}</strong></span>
         </div>
       </motion.div>
 
-      {/* Chart with Mode Toggle */}
+      {/* Live Alice Blue chart (read only for users) */}
       <motion.div variants={itemVariants} className="space-y-2">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-[var(--text-primary)]">Technical Chart (Indian Indices)</span>
+            <span className="text-xs font-bold text-[var(--text-primary)]">Live Chart · {market}</span>
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
-              Interactive & Editable (Free Plan)
+              Alice Blue · Real-time
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => {
-                const defBullish = liveData.bullishZone || liveData.supportZone || { from: 24050, to: 24150 }
-                const defBearish = liveData.bearishZone || liveData.resistanceZone || { from: 24420, to: 24520 }
-                setCustomBullish(defBullish)
-                setCustomBearish(defBearish)
-              }}
-              className="flex items-center gap-1 px-2.5 py-1 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[10px] font-bold text-slate-300 hover:text-white transition-all"
-              title="Reset chart zones to the official levels published by Super Admin"
-            >
-              <RotateCcw size={11} />
-              <span>Reset to Published Zones</span>
-            </button>
-          </div>
+          <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
+            <Lock size={11} /> Zones & drawings are published by the admin
+          </span>
         </div>
 
-        <InteractiveIndianChart
-          market={market}
-          timeframe="15m"
-          bullishZone={customBullish}
-          bearishZone={customBearish}
-          invalidationLevel={
-            typeof liveData.invalidationLevel === 'number'
-              ? liveData.invalidationLevel
-              : 24100
-          }
-          onBullishZoneChange={(z) => setCustomBullish(z)}
-          onBearishZoneChange={(z) => setCustomBearish(z)}
-          readOnly={false}
-          height={460}
+        <LiveChart
+          symbol={market}
+          height={500}
+          defaultTimeframe={liveData.chartTimeframe || '15m'}
+          defaultRange={liveData.chartRange || '1W'}
+          bullishZone={published ? liveData.bullishZone || liveData.supportZone : undefined}
+          bearishZone={published ? liveData.bearishZone || liveData.resistanceZone : undefined}
+          liquidityZone={published ? liveData.liquidityZone : undefined}
+          invalidationLevel={published ? liveData.invalidationLevel : undefined}
+          drawings={published ? liveData.drawings || [] : []}
         />
       </motion.div>
 
@@ -290,7 +228,7 @@ export default function Home() {
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
-                {liveData.summary || currentAnalysis?.detailed_notes || 'Consolidation phase active. Watch defined key levels.'}
+                {liveData.summary}
               </p>
               {liveData.notes && (
                 <p className="text-[11px] text-[var(--text-muted)] mt-2 italic">

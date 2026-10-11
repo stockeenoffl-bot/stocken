@@ -22,7 +22,7 @@ import {
   Instagram,
   LineChart,
 } from 'lucide-react'
-import TradingViewChart from '@/components/charts/TradingViewChart'
+import LiveChart from '@/components/charts/LiveChart'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 30 },
@@ -296,7 +296,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Live TradingView Interactive Chart Showcase */}
+      {/* Live Alice Blue Chart Showcase */}
       <section id="live-chart" className="py-16 px-6 border-t border-b" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}>
         <div className="max-w-6xl mx-auto space-y-6">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
@@ -306,10 +306,10 @@ export default function Landing() {
                 <span className="text-[11px] font-semibold" style={{ color: 'var(--accent-indigo)' }}>Live Market Terminal</span>
               </div>
               <h2 className="text-2xl md:text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                Test-Drive the Live TradingView Chart
+                See the Live Market Chart
               </h2>
               <p className="text-xs md:text-sm mt-1 max-w-xl" style={{ color: 'var(--text-secondary)' }}>
-                Real-time tick streaming with full drawing and marking toolbars. Draw your supply and demand zones, trace trendlines, calculate Fibonacci ratios, or test indicators live.
+                Real-time NSE candles streamed from Alice Blue across every timeframe, with expert supply and demand zones published live by our analysts.
               </p>
             </div>
 
@@ -325,7 +325,7 @@ export default function Landing() {
           </div>
 
           <div className="shadow-2xl rounded-xl overflow-hidden border" style={{ borderColor: 'var(--border-subtle)' }}>
-            <TradingViewChart defaultSymbol="NSE:NIFTY" height={520} />
+            <LiveChart symbol="NIFTY 50" height={520} />
           </div>
         </div>
       </section>

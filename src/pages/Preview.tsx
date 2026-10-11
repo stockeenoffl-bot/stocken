@@ -3,8 +3,7 @@ import { motion } from 'framer-motion'
 import { Eye, Smartphone, Monitor, ShieldCheck, Calendar, ArrowUpRight } from 'lucide-react'
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useMarket } from '@/contexts/MarketContext'
-import CandlestickChart from '@/components/charts/CandlestickChart'
-import TradingViewChart from '@/components/charts/TradingViewChart'
+import LiveChart from '@/components/charts/LiveChart'
 
 const container = {
   hidden: { opacity: 0 },
@@ -20,7 +19,6 @@ export default function Preview() {
   const { analysis } = useAnalysis()
   const { market } = useMarket()
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>('desktop')
-  const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
@@ -114,43 +112,18 @@ export default function Preview() {
               </h2>
             </div>
 
-            {/* Interactive Chart with Mode Toggle */}
+            {/* Live Alice Blue chart exactly as users see it */}
             <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-[var(--text-primary)]">Preview Chart</span>
-                <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
-                  <button
-                    onClick={() => setChartMode('tradingview')}
-                    className={`px-3 py-1 rounded-md font-medium transition-all ${
-                      chartMode === 'tradingview'
-                        ? 'bg-[var(--accent-indigo)] text-white'
-                        : 'text-[var(--text-secondary)] hover:text-white'
-                    }`}
-                  >
-                    TradingView Live
-                  </button>
-                  <button
-                    onClick={() => setChartMode('system')}
-                    className={`px-3 py-1 rounded-md font-medium transition-all ${
-                      chartMode === 'system'
-                        ? 'bg-[var(--accent-indigo)] text-white'
-                        : 'text-[var(--text-secondary)] hover:text-white'
-                    }`}
-                  >
-                    System View
-                  </button>
-                </div>
-              </div>
-
+              <span className="text-xs font-bold text-[var(--text-primary)]">Preview Chart</span>
               <div className="rounded-lg overflow-hidden border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
-                {chartMode === 'tradingview' ? (
-                  <TradingViewChart
-                    defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
-                    height={viewMode === 'mobile' ? 420 : 500}
-                  />
-                ) : (
-                  <CandlestickChart />
-                )}
+                <LiveChart
+                  symbol={market}
+                  height={viewMode === 'mobile' ? 420 : 500}
+                  bullishZone={analysis.bullishZone}
+                  bearishZone={analysis.bearishZone}
+                  liquidityZone={analysis.liquidityZone}
+                  invalidationLevel={analysis.invalidationLevel}
+                />
               </div>
             </div>
 

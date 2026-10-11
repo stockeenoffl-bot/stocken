@@ -17,12 +17,13 @@ import {
   ChevronDown,
   Zap,
 } from 'lucide-react'
-import InteractiveIndianChart, { type ZoneDefinition, type CustomDrawing } from '@/components/charts/InteractiveIndianChart'
+import LiveChart from '@/components/charts/LiveChart'
+import type { ChartDrawing } from '@/types/chart'
+import type { RangeKey, Timeframe } from '@/lib/candles'
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { analysisService } from '@/services/analysisService'
 import { broadcastSyncService } from '@/services/broadcastSyncService'
-import { aliceBlueService } from '@/services/aliceBlueService'
 import { toast } from 'sonner'
 
 const container = {
@@ -44,7 +45,9 @@ export default function Create() {
   const [analysisDate, setAnalysisDate] = useState('29 Apr 2025')
   const [isSaving, setIsSaving] = useState(false)
   const [showAdditionalZone, setShowAdditionalZone] = useState(false)
-  const [customDrawings, setCustomDrawings] = useState<CustomDrawing[]>([])
+  const [customDrawings, setCustomDrawings] = useState<ChartDrawing[]>([])
+  const [chartView, setChartView] = useState<{ timeframe: Timeframe; range: RangeKey }>({ timeframe: '15m', range: '1W' })
+  const [hydratedFor, setHydratedFor] = useState<string | null>(null)
 
   // Last publication tracking
   const [lastPublishedInfo, setLastPublishedInfo] = useState<{
@@ -79,43 +82,68 @@ export default function Create() {
   const publisherName = profile?.full_name || 'Barath'
   const publisherRole = 'Super Admin'
 
-  // Sync zones with Indian index presets when market changes
+  const PRESETS: Record<string, Partial<typeof analysis>> = {
+    'NIFTY 50': {
+      bullishZone: { from: 24050, to: 24150 },
+      bearishZone: { from: 24420, to: 24520 },
+      liquidityZone: { from: 24200, to: 24280 },
+      biasStatement: 'Bullish above 24,220',
+      invalidationLevel: 24100,
+    },
+    SENSEX: {
+      bullishZone: { from: 79050, to: 79200 },
+      bearishZone: { from: 79650, to: 79800 },
+      liquidityZone: { from: 79350, to: 79500 },
+      biasStatement: 'Bullish above 79,250',
+      invalidationLevel: 78950,
+    },
+  }
+
+  /** Load what is currently LIVE for this market so the admin edits the real thing. */
+  const hydrateFromLive = (market: 'NIFTY 50' | 'SENSEX') => {
+    const live = broadcastSyncService.getMarketData(market)
+    if (live.published) {
+      const cap = (b: string) => (b.charAt(0).toUpperCase() + b.slice(1)) as 'Bullish' | 'Bearish' | 'Neutral'
+      setAnalysis({
+        ...analysis,
+        bullishZone: live.bullishZone || live.supportZone,
+        bearishZone: live.bearishZone || live.resistanceZone,
+        liquidityZone: live.liquidityZone || { from: 0, to: 0 },
+        overallBias: cap(live.bias),
+        biasStatement: live.biasStatement || '',
+        invalidationLevel: Number(live.invalidationLevel) || 0,
+        sessions: live.sessions || analysis.sessions,
+        notes: live.notes || '',
+      })
+      setCustomDrawings(live.drawings || [])
+      setChartView({ timeframe: live.chartTimeframe || '15m', range: live.chartRange || '1W' })
+    } else {
+      setAnalysis({ ...analysis, ...(PRESETS[market] as any) })
+      setCustomDrawings([])
+    }
+    setHydratedFor(market)
+  }
+
+  // Once the database state has arrived, start from the currently published analysis
+  useEffect(() => {
+    if (hydratedFor === selectedMarket) return
+    if (broadcastSyncService.isReady()) {
+      hydrateFromLive(selectedMarket)
+      return
+    }
+    const unsub = broadcastSyncService.subscribe(() => {
+      if (broadcastSyncService.isReady()) {
+        unsub()
+        hydrateFromLive(selectedMarket)
+      }
+    })
+    return unsub
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedMarket, hydratedFor])
+
   const handleMarketChange = (market: 'NIFTY 50' | 'SENSEX') => {
     setSelectedMarket(market)
-    if (market === 'SENSEX') {
-      setAnalysis({
-        ...analysis,
-        bullishZone: { from: 79050, to: 79200 },
-        bearishZone: { from: 79650, to: 79800 },
-        liquidityZone: { from: 79350, to: 79500 },
-        biasStatement: 'Bullish above 79,250',
-        invalidationLevel: 78950,
-      })
-    } else {
-      setAnalysis({
-        ...analysis,
-        bullishZone: { from: 24050, to: 24150 },
-        bearishZone: { from: 24420, to: 24520 },
-        liquidityZone: { from: 24200, to: 24280 },
-        biasStatement: 'Bullish above 24,220',
-        invalidationLevel: 24100,
-      })
-    }
-  }
-
-  // Zone handlers from interactive chart drag
-  const handleBullishZoneFromChart = (zone: ZoneDefinition) => {
-    setAnalysis({
-      ...analysis,
-      bullishZone: { from: Math.round(zone.from), to: Math.round(zone.to) },
-    })
-  }
-
-  const handleBearishZoneFromChart = (zone: ZoneDefinition) => {
-    setAnalysis({
-      ...analysis,
-      bearishZone: { from: Math.round(zone.from), to: Math.round(zone.to) },
-    })
+    setHydratedFor(null)
   }
 
   // Clear all handler
@@ -142,26 +170,33 @@ export default function Create() {
     const formattedTimestamp = getISTFormattedTime()
 
     try {
-      // 1. Instant broadcast to all active subscriber tabs via broadcastSyncService
-      await broadcastSyncService.broadcastMarketUpdate(
-        selectedMarket,
-        {
-          bias: analysis.overallBias.toLowerCase() as 'bullish' | 'bearish' | 'neutral',
-          summary: analysis.biasStatement || analysis.notes || `${selectedMarket} Technical Analysis Update`,
-          biasStatement: analysis.biasStatement,
-          invalidationLevel: Number(analysis.invalidationLevel) || analysis.invalidationLevel,
-          supportZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
-          resistanceZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
-          bullishZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
-          bearishZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
-          sessions: analysis.sessions,
-          notes: analysis.notes,
-          publishedAtFormatted: formattedTimestamp,
-          updatedBy: `${publisherName} (${publisherRole})`,
-          publishedByRole: publisherRole,
-        },
-        `${publisherName} (${publisherRole})`
-      )
+      // 1. PUBLISH: write to the shared database; Supabase Realtime pushes it to every user instantly.
+      //    Drafts are never shown to users.
+      if (status === 'published') {
+        await broadcastSyncService.broadcastMarketUpdate(
+          selectedMarket,
+          {
+            bias: analysis.overallBias.toLowerCase() as 'bullish' | 'bearish' | 'neutral',
+            summary: analysis.biasStatement || analysis.notes || `${selectedMarket} Technical Analysis Update`,
+            biasStatement: analysis.biasStatement,
+            invalidationLevel: Number(analysis.invalidationLevel) || analysis.invalidationLevel,
+            supportZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
+            resistanceZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
+            bullishZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
+            bearishZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
+            liquidityZone: analysis.liquidityZone,
+            sessions: analysis.sessions,
+            notes: analysis.notes,
+            drawings: customDrawings,
+            chartTimeframe: chartView.timeframe,
+            chartRange: chartView.range,
+            publishedAtFormatted: formattedTimestamp,
+            updatedBy: `${publisherName} (${publisherRole})`,
+            publishedByRole: publisherRole,
+          },
+          `${publisherName} (${publisherRole})`
+        )
+      }
 
       // 2. Best-effort Supabase backend save
       try {
@@ -204,6 +239,7 @@ export default function Create() {
       }
 
       // Record last published info
+      if (status === 'published') {
       const pubInfo = {
         time: formattedTimestamp,
         author: `${publisherName} • ${publisherRole}`,
@@ -211,6 +247,7 @@ export default function Create() {
       }
       setLastPublishedInfo(pubInfo)
       localStorage.setItem('zonal_edge_last_published_info', JSON.stringify(pubInfo))
+      }
 
       if (status === 'published') {
         toast.success(
@@ -218,7 +255,7 @@ export default function Create() {
           { duration: 5000 }
         )
       } else {
-        toast.success(`💾 Analysis draft saved at ${formattedTimestamp}`)
+        toast.success(`💾 Draft saved at ${formattedTimestamp} (not visible to users)`)
       }
     } catch (err: any) {
       toast.error(err.message || 'Failed to save analysis')
@@ -345,36 +382,35 @@ export default function Create() {
               2
             </div>
             <h3 className="text-sm font-bold text-white tracking-wide">
-              Market Chart ({selectedMarket} &middot; 15m &middot; NSE)
+              Market Chart ({selectedMarket} &middot; {chartView.timeframe} &middot; {chartView.range})
             </h3>
           </div>
 
           <div className="flex items-center gap-2">
             <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30 flex items-center gap-1.5">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Alice Blue Live Indian Data Feed
+              Alice Blue Live Data Feed
             </span>
           </div>
         </div>
 
-        {/* Live Interactive Chart with Drag-to-Resize Zones */}
-        <div className="rounded-lg overflow-hidden border border-[#1A2234]">
-          <InteractiveIndianChart
-            market={selectedMarket}
-            timeframe="15m"
-            bullishZone={analysis.bullishZone}
-            bearishZone={analysis.bearishZone}
-            invalidationLevel={analysis.invalidationLevel}
-            onBullishZoneChange={handleBullishZoneFromChart}
-            onBearishZoneChange={handleBearishZoneFromChart}
-            customDrawings={customDrawings}
-            onCustomDrawingsChange={setCustomDrawings}
-            height={440}
-            readOnly={false}
-          />
-        </div>
+        {/* Live Alice Blue chart with admin-only drawing tools */}
+        <LiveChart
+          symbol={selectedMarket}
+          height={560}
+          defaultTimeframe={chartView.timeframe}
+          defaultRange={chartView.range}
+          bullishZone={analysis.bullishZone}
+          bearishZone={analysis.bearishZone}
+          liquidityZone={analysis.liquidityZone}
+          invalidationLevel={analysis.invalidationLevel}
+          drawings={customDrawings}
+          editable
+          onDrawingsChange={setCustomDrawings}
+          onViewChange={setChartView}
+        />
         <p className="text-[11px] text-slate-500 italic">
-          💡 <strong>Interactive Admin Canvas:</strong> Drag the red Bearish Zone or green Bullish Zone handles directly on the chart to reposition them. Values will automatically update in Step 3 below.
+          💡 <strong>Admin canvas:</strong> use the left toolbar to draw trendlines, levels, boxes and notes (double-click a drawing to delete). Zones come from Step 3. Users only see the finished chart — they cannot draw or edit. Nothing goes live until you press <strong>Preview &amp; Publish</strong>.
         </p>
       </motion.div>
 

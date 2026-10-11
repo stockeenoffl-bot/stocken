@@ -26,6 +26,7 @@ export default function TopHeader() {
       setBrokerConnected(aliceBlueService.isConfigured() && aliceBlueService.isSessionActive())
     }
     updateBrokerStatus()
+    void aliceBlueService.refreshStatus()
     window.addEventListener('aliceblue-status-change', updateBrokerStatus)
     return () => window.removeEventListener('aliceblue-status-change', updateBrokerStatus)
   }, [])

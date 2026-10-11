@@ -24,15 +24,9 @@ import {
   Sparkles,
   Check,
 } from 'lucide-react'
-import CandlestickChart from '@/components/charts/CandlestickChart'
-import TradingViewChart from '@/components/charts/TradingViewChart'
+import LiveChart from '@/components/charts/LiveChart'
+import QuotesBoard from '@/components/charts/QuotesBoard'
 import StatCard from '@/components/StatCard'
-import {
-  TradingViewMarketQuotes,
-  TradingViewTechnicalAnalysis,
-  TradingViewStockHeatmap,
-  TradingViewIndianScreener,
-} from '@/components/tradingview'
 import { useMarket } from '@/contexts/MarketContext'
 import { userService } from '@/services/userService'
 import { aliceBlueService } from '@/services/aliceBlueService'
@@ -55,7 +49,6 @@ export default function Dashboard() {
   const [activeSubTab, setActiveSubTab] = useState('analysis')
   const [stats, setStats] = useState({ totalUsers: 0, proUsers: 0 })
   const [recentUsers, setRecentUsers] = useState<any[]>([])
-  const [chartMode, setChartMode] = useState<'tradingview' | 'system'>('tradingview')
   const [brokerConnected, setBrokerConnected] = useState(false)
   const [brokerConfigured, setBrokerConfigured] = useState(false)
 
@@ -91,10 +84,22 @@ export default function Dashboard() {
     setEditResFrom(String(data.resistanceZone?.from || ''))
     setEditResTo(String(data.resistanceZone?.to || ''))
 
+    let hydrated = broadcastSyncService.isReady()
     const unsubscribe = broadcastSyncService.subscribe(() => {
       const refreshed = broadcastSyncService.getMarketData(market)
       setLiveData(refreshed)
       setCurrentAlert(broadcastSyncService.getUrgentAlert())
+      // First time the database state arrives: fill the form with what is currently published
+      if (!hydrated && broadcastSyncService.isReady()) {
+        hydrated = true
+        setEditBias(refreshed.bias)
+        setEditSummary(refreshed.summary)
+        setEditInvalidation(String(refreshed.invalidationLevel))
+        setEditSupportFrom(String(refreshed.supportZone?.from || ''))
+        setEditSupportTo(String(refreshed.supportZone?.to || ''))
+        setEditResFrom(String(refreshed.resistanceZone?.from || ''))
+        setEditResTo(String(refreshed.resistanceZone?.to || ''))
+      }
     })
     return () => unsubscribe()
   }, [market])
@@ -116,7 +121,7 @@ export default function Dashboard() {
         },
       })
       setLiveData(updated)
-      toast.success(`⚡ Live broadcast sent! All users' dashboards updated with live ${market} bias & levels.`)
+      toast.success(`⚡ Published! Every user's ${market} view updates within a second.`)
     } catch (err: any) {
       toast.error('Failed to broadcast: ' + err.message)
     } finally {
@@ -124,25 +129,33 @@ export default function Dashboard() {
     }
   }
 
-  const handlePostAlert = () => {
+  const handlePostAlert = async () => {
     if (!alertTitle.trim() || !alertMsg.trim()) {
       return toast.error('Please enter an alert title and message')
     }
-    const created = broadcastSyncService.broadcastUrgentAlert({
-      title: alertTitle,
-      message: alertMsg,
-      severity: alertSeverity,
-    })
-    setCurrentAlert(created)
-    setAlertTitle('')
-    setAlertMsg('')
-    toast.success('Urgent Market Alert broadcasted to all users!')
+    try {
+      const created = await broadcastSyncService.broadcastUrgentAlert({
+        title: alertTitle,
+        message: alertMsg,
+        severity: alertSeverity,
+      })
+      setCurrentAlert(created)
+      setAlertTitle('')
+      setAlertMsg('')
+      toast.success('Urgent Market Alert pushed to all users!')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to push alert')
+    }
   }
 
-  const handleClearAlert = () => {
-    broadcastSyncService.clearUrgentAlert()
-    setCurrentAlert(null)
-    toast.info('Urgent Market Alert cleared.')
+  const handleClearAlert = async () => {
+    try {
+      await broadcastSyncService.clearUrgentAlert()
+      setCurrentAlert(null)
+      toast.info('Urgent Market Alert cleared for all users.')
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to clear alert')
+    }
   }
 
   const handleAIAnalysis = async () => {
@@ -191,6 +204,7 @@ export default function Dashboard() {
       setBrokerConnected(aliceBlueService.isConfigured() && aliceBlueService.isSessionActive())
     }
     checkBroker()
+    void aliceBlueService.refreshStatus().then(checkBroker)
 
     const onStatusChange = () => checkBroker()
     window.addEventListener('aliceblue-status-change', onStatusChange)
@@ -575,47 +589,28 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              {/* Chart with Mode Toggle */}
+              {/* Live Alice Blue chart (admin sees the same live view users get) */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-bold text-[var(--text-primary)]">Technical Chart</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
-                      Live Real-Time
-                    </span>
-                  </div>
-                  <div className="flex items-center rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] p-0.5 text-xs">
-                    <button
-                      onClick={() => setChartMode('tradingview')}
-                      className={`px-3 py-1 rounded-md font-medium transition-all ${
-                        chartMode === 'tradingview'
-                          ? 'bg-[var(--accent-indigo)] text-white'
-                          : 'text-[var(--text-secondary)] hover:text-white'
-                      }`}
-                    >
-                      TradingView Pro (Live + Draw)
-                    </button>
-                    <button
-                      onClick={() => setChartMode('system')}
-                      className={`px-3 py-1 rounded-md font-medium transition-all ${
-                        chartMode === 'system'
-                          ? 'bg-[var(--accent-indigo)] text-white'
-                          : 'text-[var(--text-secondary)] hover:text-white'
-                      }`}
-                    >
-                      Zonal Edge View
-                    </button>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-[var(--text-primary)]">Live Chart ({market})</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                    Alice Blue · Real-time
+                  </span>
+                  <Link to="/create" className="ml-auto text-[11px] font-semibold text-[var(--accent-indigo)] hover:underline">
+                    Draw zones & publish →
+                  </Link>
                 </div>
-
-                {chartMode === 'tradingview' ? (
-                  <TradingViewChart
-                    defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
-                    height={540}
-                  />
-                ) : (
-                  <CandlestickChart />
-                )}
+                <LiveChart
+                  symbol={market}
+                  height={540}
+                  defaultTimeframe={liveData.chartTimeframe || '15m'}
+                  defaultRange={liveData.chartRange || '1W'}
+                  bullishZone={liveData.bullishZone || liveData.supportZone}
+                  bearishZone={liveData.bearishZone || liveData.resistanceZone}
+                  liquidityZone={liveData.liquidityZone}
+                  invalidationLevel={liveData.invalidationLevel}
+                  drawings={liveData.drawings || []}
+                />
               </div>
 
               {/* Analysis + Status */}
@@ -725,28 +720,13 @@ export default function Dashboard() {
 
               {/* Indian Market Live Pulse Section */}
               <div className="space-y-3 pt-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-[var(--text-primary)]">
-                      Indian Markets Live Watchlist & Sentiment
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
-                      TradingView Feeds
-                    </span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-bold text-[var(--text-primary)]">Indian Markets Live Watchlist</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-semibold border border-emerald-500/20">
+                    Alice Blue
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <div className="lg:col-span-2">
-                    <TradingViewMarketQuotes height={520} />
-                  </div>
-                  <div>
-                    <TradingViewTechnicalAnalysis
-                      defaultSymbol={market === 'SENSEX' ? 'BSE:SENSEX' : 'NSE:NIFTY'}
-                      height={450}
-                    />
-                  </div>
-                </div>
+                <QuotesBoard title="Indices & Heavyweights" symbols={['NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'INDIA VIX', 'RELIANCE', 'HDFCBANK', 'ICICIBANK', 'TCS', 'INFY']} />
               </div>
             </div>
           )}
@@ -754,32 +734,16 @@ export default function Dashboard() {
           {/* INDIAN MARKET HUB TAB */}
           {activeSubTab === 'indian-markets' && (
             <div className="space-y-5">
-              <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-                    <span>Indian Markets Live TradingView Widgets</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
-                      NSE & BSE
-                    </span>
-                  </h3>
-                  <p className="text-xs text-[var(--text-muted)] mt-0.5">
-                    Real-time stock screener, sector heatmap, and institutional market quotes.
-                  </p>
-                </div>
+              <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)]">
+                <h3 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
+                  <span>Indian Markets · Live</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">NSE & BSE</span>
+                </h3>
+                <p className="text-xs text-[var(--text-muted)] mt-0.5">Live quotes streamed from Alice Blue.</p>
               </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                <div className="lg:col-span-2">
-                  <TradingViewMarketQuotes height={560} />
-                </div>
-                <div>
-                  <TradingViewTechnicalAnalysis defaultSymbol="NSE:NIFTY" height={480} />
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <TradingViewStockHeatmap height={560} />
-                <TradingViewIndianScreener height={560} />
+                <QuotesBoard title="Indices" symbols={['NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX', 'INDIA VIX']} />
+                <QuotesBoard title="Top Stocks" symbols={['RELIANCE', 'HDFCBANK', 'ICICIBANK', 'TCS', 'INFY', 'SBIN', 'ITC', 'LT', 'AXISBANK', 'BHARTIARTL']} />
               </div>
             </div>
           )}

@@ -1,21 +1,69 @@
-// Alice Blue ANT A3 Broker API Integration Service
-// References:
-// - A3 Portal: https://a3.aliceblueonline.com
-// - Documentation: https://ant.aliceblueonline.com/productdocumentation/
-// - Python SDK: Ant-A3-tradehub-sdk-production
-// - Video Setup: https://youtu.be/SMFO4zmK2e8
+// Alice Blue ANT A3 - browser client.
+//
+// SECURITY MODEL
+//  * The API secret and the daily userSession live ONLY on the server
+//    (api/broker.ts + Supabase `broker_session`). They are never sent to browsers.
+//  * Every visitor (admin or subscriber) reads market data through the gateway,
+//    so one admin login powers live charts for all users.
+//  * Only a logged-in admin can create/clear the session.
+import { supabase } from '@/lib/supabase'
+import { isMarketOpenIST, type RangeKey, type Timeframe } from '@/lib/candles'
 
-export interface AliceBlueCredentials {
-  userId: string            // Client Code / User ID (e.g. AB123456)
-  appId: string             // App ID / API Key from https://a3.aliceblueonline.com
-  apiSecret: string         // API Secret Key
-  ipAddress: string         // Registered IPv4 Address (Static IP required by Alice Blue)
-  sessionToken?: string     // Generated User Session Token
-  sessionCreatedAt?: number // Unix timestamp (ms)
-  environment: 'live' | 'paper' // Live Production vs Sandbox / Paper Trading
-  dataFeedEnabled: boolean  // Use Alice Blue as primary Indian market data feed
-  lastConnectedAt?: number
+export type { RangeKey, Timeframe }
+
+const API = '/api/broker'
+
+export interface Candle {
+  time: number // unix seconds (UTC)
+  open: number
+  high: number
+  low: number
+  close: number
+  volume: number
+}
+
+export interface AliceBlueQuote {
+  symbol: string
+  name: string
+  exchange: string
+  kind: 'index' | 'equity' | string
+  ltp: number
+  change: number
+  changePercent: number
+  open: number
+  high: number
+  low: number
+  prevClose: number
+  volume: number
+  ts: number
+  source: 'aliceblue' | 'yahoo'
+}
+
+export interface GatewayStatus {
+  configured: boolean
+  appId?: string
+  ipAddress?: string
+  connected: boolean
+  reason: 'ok' | 'no-session' | 'expired' | 'stale' | string
   lastError?: string
+  persisted: boolean
+  marketOpen: boolean
+  session: { userId: string; createdAt: number } | null
+  loginUrl: string | null
+  serverTime: number
+}
+
+export interface HistoryResponse {
+  symbol: string
+  name: string
+  exchange: string
+  timeframe: Timeframe
+  range: RangeKey
+  source: 'aliceblue' | 'yahoo'
+  clamped: boolean
+  marketOpen: boolean
+  serverTime: number
+  candles: Candle[]
 }
 
 export interface ConnectionDiagnostic {
@@ -24,601 +72,187 @@ export interface ConnectionDiagnostic {
   message: string
 }
 
-export interface AliceBlueQuote {
+export interface SymbolResult {
   symbol: string
-  exchange: 'NSE' | 'BSE' | 'NFO'
-  ltp: number
-  change: number
-  changePercent: number
-  open: number
-  high: number
-  low: number
-  volume: number
-  timestamp: string
+  name: string
+  exchange: string
+  token: string
+  kind: string
+  ref: string
 }
 
-const STORAGE_KEY = 'alice_blue_credentials_v1'
-
-class AliceBlueService {
-  private credentials: AliceBlueCredentials | null = null
-  private ws: WebSocket | null = null
-  private wsCallbacks: Set<(data: any) => void> = new Set()
-  private heartbeatInterval: NodeJS.Timeout | null = null
-
-  constructor() {
-    this.loadCredentials()
+async function getJson<T>(params: Record<string, string>): Promise<T> {
+  const qs = new URLSearchParams(params).toString()
+  const res = await fetch(`${API}?${qs}`, { headers: { Accept: 'application/json' } })
+  const text = await res.text()
+  let json: any = null
+  try { json = JSON.parse(text) } catch { /* not json */ }
+  if (!res.ok || !json) {
+    throw new Error(json?.error || `Market data service unavailable (HTTP ${res.status})`)
   }
+  return json as T
+}
 
-  /**
-   * Load credentials from persistent storage with secure environment defaults
-   */
-  public loadCredentials(): AliceBlueCredentials | null {
-    const envDefaults: AliceBlueCredentials = {
-      userId: 'VIKNESH',
-      appId: (import.meta.env.VITE_ALICE_BLUE_APP_ID as string) || 'MRqf87ghkM',
-      apiSecret: (import.meta.env.VITE_ALICE_BLUE_API_SECRET as string) || 'OfA3ZtI30egaDMxmkeLh9bsNEOz0pW8RLLMzpz0RiTKrofsraADqA0c9I1ZjiAPlOHe3gnIovWrPHeeU6rDbbM6MMy2UmtYHxGz7',
-      ipAddress: (import.meta.env.VITE_ALICE_BLUE_PUBLIC_IP as string) || '223.178.83.118',
-      environment: 'live',
-      dataFeedEnabled: true,
-      sessionToken: `AB_LIVE_${Date.now().toString(36).toUpperCase()}`,
-      sessionCreatedAt: Date.now(),
-    }
-
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const parsed = JSON.parse(stored)
-        this.credentials = {
-          ...envDefaults,
-          ...parsed,
-          appId: parsed.appId?.trim() ? parsed.appId : envDefaults.appId,
-          apiSecret: parsed.apiSecret?.trim() ? parsed.apiSecret : envDefaults.apiSecret,
-          ipAddress: parsed.ipAddress?.trim() ? parsed.ipAddress : envDefaults.ipAddress,
-          sessionToken: parsed.sessionToken || envDefaults.sessionToken,
-          sessionCreatedAt: parsed.sessionCreatedAt || envDefaults.sessionCreatedAt,
-        }
-        return this.credentials
-      }
-    } catch (e) {
-      console.error('[AliceBlue] Error parsing stored credentials:', e)
-    }
-
-    // Default template pre-loaded with secure keys
-    this.credentials = envDefaults
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(envDefaults))
-    } catch (_) {}
-    return envDefaults
-  }
-
-  /**
-   * Save credentials to persistent storage
-   */
-  public saveCredentials(creds: Partial<AliceBlueCredentials>): AliceBlueCredentials {
-    const current = this.loadCredentials() || {
-      userId: '',
-      appId: '',
-      apiSecret: '',
-      ipAddress: '',
-      environment: 'live',
-      dataFeedEnabled: true,
-    }
-
-    const updated: AliceBlueCredentials = {
-      ...current,
-      ...creds,
-    }
-
-    this.credentials = updated
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated))
-      window.dispatchEvent(new CustomEvent('aliceblue-status-change', { detail: updated }))
-    } catch (e) {
-      console.error('[AliceBlue] Error saving credentials to storage:', e)
-    }
-
-    return updated
-  }
-
-  /**
-   * Clear credentials
-   */
-  public clearCredentials(): void {
-    localStorage.removeItem(STORAGE_KEY)
-    this.credentials = null
-    window.dispatchEvent(new CustomEvent('aliceblue-status-change', { detail: null }))
-  }
-
-  /**
-   * Check whether Alice Blue credentials are fully configured
-   */
-  public isConfigured(): boolean {
-    const creds = this.credentials || this.loadCredentials()
-    return Boolean(
-      creds &&
-      creds.userId.trim() &&
-      creds.appId.trim() &&
-      creds.apiSecret.trim() &&
-      creds.ipAddress.trim()
+async function adminPost<T = any>(action: string, payload: Record<string, any> = {}): Promise<T> {
+  const { data } = await supabase.auth.getSession()
+  const token = data.session?.access_token
+  const res = await fetch(API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token || ''}` },
+    body: JSON.stringify({ action, ...payload }),
+  })
+  const text = await res.text()
+  let json: any = null
+  try { json = JSON.parse(text) } catch { /* not json */ }
+  if (!json) {
+    throw new Error(
+      res.status === 404
+        ? 'Broker gateway not found. Deploy the /api folder (Vercel) or run `npm run dev` which serves it locally.'
+        : `Broker gateway error (HTTP ${res.status})`
     )
   }
+  return json as T
+}
 
-  /**
-   * Check whether active session token is valid (Alice Blue tokens typically expire at 03:30 AM / 24h)
-   */
+type QuoteListener = (quotes: AliceBlueQuote[], meta: { marketOpen: boolean }) => void
+
+class AliceBlueService {
+  private status: GatewayStatus | null = null
+  private statusPromise: Promise<GatewayStatus | null> | null = null
+  private pollTimer: ReturnType<typeof setInterval> | null = null
+
+  constructor() {
+    if (typeof window !== 'undefined') {
+      setTimeout(() => {
+        void this.refreshStatus()
+        this.pollTimer = setInterval(() => void this.refreshStatus(), 60000)
+      }, 0)
+    }
+  }
+
+  // ------------------------------- status ---------------------------------
+  public async refreshStatus(): Promise<GatewayStatus | null> {
+    if (this.statusPromise) return this.statusPromise
+    this.statusPromise = (async () => {
+      try {
+        const s = await getJson<GatewayStatus>({ action: 'status' })
+        const changed = JSON.stringify([this.status?.connected, this.status?.configured]) !== JSON.stringify([s.connected, s.configured])
+        this.status = s
+        if (changed || !this.status) window.dispatchEvent(new CustomEvent('aliceblue-status-change', { detail: s }))
+        return s
+      } catch {
+        return this.status
+      } finally {
+        this.statusPromise = null
+      }
+    })()
+    const s = await this.statusPromise
+    return s
+  }
+
+  public getStatus(): GatewayStatus | null {
+    return this.status
+  }
+
+  /** Server has App ID + secret. */
+  public isConfigured(): boolean {
+    return Boolean(this.status?.configured)
+  }
+
+  /** Server holds a valid Alice Blue session -> live broker data is flowing. */
   public isSessionActive(): boolean {
-    const creds = this.credentials || this.loadCredentials()
-    if (!creds?.sessionToken || !creds.sessionCreatedAt) return false
+    return Boolean(this.status?.connected)
+  }
 
-    // Expire session after 18 hours (intraday trading day)
-    const isExpired = Date.now() - creds.sessionCreatedAt > 18 * 60 * 60 * 1000
-    return !isExpired
+  // ------------------------------- market data ----------------------------
+  public async getQuotes(symbols: string[]): Promise<{ quotes: AliceBlueQuote[]; marketOpen: boolean }> {
+    const r = await getJson<{ quotes: AliceBlueQuote[]; marketOpen: boolean }>({
+      action: 'quotes',
+      symbols: symbols.join(','),
+    })
+    return r
+  }
+
+  /** Back-compat helper used by dashboards: the 4 headline indices. */
+  public async getLiveIndexQuotes(): Promise<AliceBlueQuote[]> {
+    const { quotes } = await this.getQuotes(['NIFTY 50', 'SENSEX', 'BANKNIFTY', 'FINNIFTY'])
+    return quotes
+  }
+
+  public async getHistory(symbol: string, timeframe: Timeframe, range: RangeKey): Promise<HistoryResponse> {
+    return getJson<HistoryResponse>({ action: 'history', symbol, timeframe, range })
+  }
+
+  public async searchSymbols(q: string): Promise<SymbolResult[]> {
+    const r = await getJson<{ results: SymbolResult[] }>({ action: 'search', q })
+    return r.results
   }
 
   /**
-   * Run full diagnostics check on credentials, format, IP format, and API reachability
+   * Live quote stream (adaptive polling through the cached gateway).
+   * ~1.5s while the market is open, 20s when closed, paused in hidden tabs.
    */
-  public async runDiagnostics(creds: AliceBlueCredentials): Promise<{
-    success: boolean
-    diagnostics: ConnectionDiagnostic[]
-  }> {
-    const diagnostics: ConnectionDiagnostic[] = []
+  public subscribeQuotes(symbols: string[], cb: QuoteListener): () => void {
+    let stopped = false
+    let timer: ReturnType<typeof setTimeout> | null = null
 
-    // 1. Check User ID / Client Code
-    if (!creds.userId.trim()) {
-      diagnostics.push({
-        step: 'Client Code / User ID',
-        status: 'error',
-        message: 'Client ID is missing. Enter your Alice Blue login ID (e.g. AB123456).',
-      })
-    } else {
-      diagnostics.push({
-        step: 'Client Code / User ID',
-        status: 'success',
-        message: `Validated: ${creds.userId.toUpperCase().trim()}`,
-      })
-    }
-
-    // 2. Check App ID
-    if (!creds.appId.trim()) {
-      diagnostics.push({
-        step: 'A3 App ID / Key',
-        status: 'error',
-        message: 'App ID is required. Create one in https://a3.aliceblueonline.com under "My Apps".',
-      })
-    } else if (creds.appId.length < 5) {
-      diagnostics.push({
-        step: 'A3 App ID / Key',
-        status: 'warning',
-        message: 'App ID appears shorter than typical Alice Blue keys.',
-      })
-    } else {
-      diagnostics.push({
-        step: 'A3 App ID / Key',
-        status: 'success',
-        message: 'App ID format validated.',
-      })
-    }
-
-    // 3. Check API Secret
-    if (!creds.apiSecret.trim()) {
-      diagnostics.push({
-        step: 'API Secret Key',
-        status: 'error',
-        message: 'API Secret is missing. Obtained alongside App ID upon approval.',
-      })
-    } else {
-      diagnostics.push({
-        step: 'API Secret Key',
-        status: 'success',
-        message: 'API Secret securely loaded.',
-      })
-    }
-
-    // 4. Check Registered IPv4 Address
-    const ipv4Regex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$/
-    if (!creds.ipAddress.trim()) {
-      diagnostics.push({
-        step: 'Static IPv4 Address',
-        status: 'error',
-        message: 'Alice Blue requires your ISP registered IPv4 address. Orders will not execute without approved IP.',
-      })
-    } else if (!ipv4Regex.test(creds.ipAddress.trim())) {
-      diagnostics.push({
-        step: 'Static IPv4 Address',
-        status: 'warning',
-        message: 'Please ensure IP is a valid IPv4 address (e.g. 103.21.244.10).',
-      })
-    } else {
-      diagnostics.push({
-        step: 'Static IPv4 Address',
-        status: 'success',
-        message: `Registered IP verified: ${creds.ipAddress.trim()}`,
-      })
-    }
-
-    // 5. Session token verification
-    if (creds.sessionToken && this.isSessionActive()) {
-      diagnostics.push({
-        step: 'Daily Session Token',
-        status: 'success',
-        message: 'Active session token ready for trading & data access.',
-      })
-    } else {
-      diagnostics.push({
-        step: 'Daily Session Token',
-        status: 'warning',
-        message: 'No active session token for today. Click "Generate Session Token" below.',
-      })
-    }
-
-    const hasError = diagnostics.some((d) => d.status === 'error')
-    return {
-      success: !hasError,
-      diagnostics,
-    }
-  }
-
-  /**
-   * Helper to compute SHA256 checksum for Alice Blue ANT handshake
-   * Formula: SHA-256(userId + authCode + apiSecret)
-   */
-  public async computeSha256Checksum(payload: string): Promise<string> {
-    const encoder = new TextEncoder()
-    const data = encoder.encode(payload)
-    const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-    const hashArray = Array.from(new Uint8Array(hashBuffer))
-    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
-  }
-
-  /**
-   * Generate Active Session Handshake (Secure Backend First, then Client Fallback)
-   */
-  public async generateSession(authCodeOrTotp?: string): Promise<{
-    success: boolean
-    token?: string
-    error?: string
-  }> {
-    const creds = this.loadCredentials()
-    if (!creds || !creds.userId || !creds.appId) {
-      return { success: false, error: 'Incomplete credentials. Please provide User ID and App ID.' }
-    }
-
-    // 1. Try secure backend serverless endpoint (/api/broker) if not in development
-    try {
-      if (typeof import.meta !== 'undefined' && import.meta.env && !import.meta.env.DEV) {
-        const res = await fetch('/api/broker', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'generate-session',
-          userId: creds.userId,
-          authCode: authCodeOrTotp,
-        }),
-      })
-
-      if (res.ok) {
-        const data = await res.json()
-        if (data?.success && data?.token) {
-          this.saveCredentials({
-            sessionToken: data.token,
-            sessionCreatedAt: Date.now(),
-            lastConnectedAt: Date.now(),
-            lastError: undefined,
-          })
-          return { success: true, token: data.token }
-          }
+    const tick = async () => {
+      if (stopped) return
+      let delay = isMarketOpenIST() ? 1500 : 20000
+      if (typeof document !== 'undefined' && document.hidden) {
+        delay = 5000
+      } else {
+        try {
+          const r = await this.getQuotes(symbols)
+          if (!stopped) cb(r.quotes, { marketOpen: r.marketOpen })
+          delay = r.marketOpen ? 1500 : 20000
+        } catch {
+          delay = 8000
         }
       }
-    } catch (_) {
-      // Backend not available (e.g. dev server without API handler), proceed to local fallback
+      if (!stopped) timer = setTimeout(tick, delay)
     }
+    void tick()
 
-    // 2. Client-side fallback handshake
-    try {
-      if (!creds.apiSecret) {
-        return { success: false, error: 'API Secret is missing.' }
-      }
-
-      const seed = `${creds.userId}${authCodeOrTotp || Date.now()}${creds.apiSecret}`
-      const checksum = await this.computeSha256Checksum(seed)
-      const generatedToken = `AB_${checksum.substring(0, 24)}_${Date.now()}`
-
-      this.saveCredentials({
-        sessionToken: generatedToken,
-        sessionCreatedAt: Date.now(),
-        lastConnectedAt: Date.now(),
-        lastError: undefined,
-      })
-
-      return { success: true, token: generatedToken }
-    } catch (err: any) {
-      const msg = err?.message || 'Failed to generate Alice Blue session'
-      this.saveCredentials({ lastError: msg })
-      return { success: false, error: msg }
+    return () => {
+      stopped = true
+      if (timer) clearTimeout(timer)
     }
   }
 
-  /**
-   * Detect current public IPv4 address for convenience
-   */
+  // ------------------------------- admin ----------------------------------
+  /** Exchange the OAuth authCode (or the full redirect URL) for today's session. */
+  public async generateSession(authCodeOrUrl: string, userId?: string) {
+    const r = await adminPost<{ success: boolean; error?: string }>('generate-session', { authCode: authCodeOrUrl, userId })
+    await this.refreshStatus()
+    return r
+  }
+
+  public async setSession(userId: string, userSession: string) {
+    const r = await adminPost<{ success: boolean; error?: string }>('set-session', { userId, userSession })
+    await this.refreshStatus()
+    return r
+  }
+
+  public async disconnect() {
+    const r = await adminPost<{ success: boolean; error?: string }>('disconnect')
+    await this.refreshStatus()
+    return r
+  }
+
+  public async runDiagnostics(): Promise<{ success: boolean; diagnostics: ConnectionDiagnostic[]; error?: string }> {
+    const r = await adminPost<{ success: boolean; diagnostics?: ConnectionDiagnostic[]; error?: string }>('diagnostics')
+    return { success: Boolean(r.success), diagnostics: r.diagnostics || [], error: r.error }
+  }
+
   public async detectPublicIp(): Promise<string | null> {
     try {
       const res = await fetch('https://api.ipify.org?format=json')
-      if (!res.ok) throw new Error('IP service unreachable')
+      if (!res.ok) return null
       const data = await res.json()
       return data.ip || null
-    } catch (e) {
-      console.warn('[AliceBlue] Could not auto-detect public IP:', e)
+    } catch {
       return null
-    }
-  }
-
-  /**
-   * Fetch Live Real-Time Indian Index Quotes via Alice Blue feed
-   */
-  public async getLiveIndexQuotes(): Promise<AliceBlueQuote[]> {
-    const creds = this.loadCredentials()
-    const isLive = creds && this.isConfigured() && this.isSessionActive()
-
-    // Real-time market baseline with dynamic micro-variations
-    const now = new Date()
-    const timeStr = now.toLocaleTimeString('en-IN', { hour12: false })
-
-    const niftyLtp = 24185.5 + (Math.random() * 8 - 4)
-    const sensexLtp = 79420.2 + (Math.random() * 25 - 12)
-    const bankNiftyLtp = 51240.8 + (Math.random() * 15 - 7)
-    const finNiftyLtp = 23980.1 + (Math.random() * 10 - 5)
-
-    return [
-      {
-        symbol: 'NIFTY 50',
-        exchange: 'NSE',
-        ltp: Number(niftyLtp.toFixed(2)),
-        change: 142.35,
-        changePercent: 0.59,
-        open: 24080.0,
-        high: 24225.4,
-        low: 24050.2,
-        volume: 384500000,
-        timestamp: timeStr,
-      },
-      {
-        symbol: 'SENSEX',
-        exchange: 'BSE',
-        ltp: Number(sensexLtp.toFixed(2)),
-        change: 485.1,
-        changePercent: 0.61,
-        open: 79100.0,
-        high: 79580.0,
-        low: 79040.0,
-        volume: 125000000,
-        timestamp: timeStr,
-      },
-      {
-        symbol: 'BANKNIFTY',
-        exchange: 'NSE',
-        ltp: Number(bankNiftyLtp.toFixed(2)),
-        change: -88.4,
-        changePercent: -0.17,
-        open: 51350.0,
-        high: 51480.0,
-        low: 51120.0,
-        volume: 215000000,
-        timestamp: timeStr,
-      },
-      {
-        symbol: 'FINNIFTY',
-        exchange: 'NSE',
-        ltp: Number(finNiftyLtp.toFixed(2)),
-        change: 62.7,
-        changePercent: 0.26,
-        open: 23920.0,
-        high: 24020.0,
-        low: 23900.0,
-        volume: 98000000,
-        timestamp: timeStr,
-      },
-    ]
-  }
-
-  /**
-   * Fetch Historical Data from Alice Blue API
-   */
-  public async getHistoricalData(params: {
-    symbol: string
-    exchange: string
-    resolution: string
-    from: number
-    to: number
-  }): Promise<any[]> {
-    const creds = this.loadCredentials()
-    if (!creds?.sessionToken) {
-      console.warn('[AliceBlue] No session token for historical data')
-      return []
-    }
-
-    // Map common indices to their tokens
-    let token = ''
-    let exchangeStr = params.exchange
-    
-    if (params.symbol === 'NIFTY 50') {
-      token = '26000'
-      exchangeStr = 'NSE'
-    } else if (params.symbol === 'SENSEX') {
-      token = '1' // General BSE index token, may need verification
-      exchangeStr = 'BSE'
-    } else if (params.symbol === 'BANKNIFTY') {
-      token = '26009'
-      exchangeStr = 'NSE'
-    }
-
-    if (!token) return []
-
-    try {
-      const response = await fetch('/api/aliceblue/open-api/od/ChartAPIService/api/chart/history', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${creds.userId} ${creds.sessionToken}`,
-        },
-        body: JSON.stringify({
-          token,
-          resolution: params.resolution,
-          from: params.from.toString(),
-          to: params.to.toString(),
-          exchange: exchangeStr
-        })
-      })
-
-      const data = await response.json()
-      if (data.stat === 'Ok' && data.result) {
-        return data.result
-      } else {
-        console.warn('[AliceBlue] Historical Data Error:', data.emsg)
-        return []
-      }
-    } catch (err) {
-      console.error('[AliceBlue] Fetch historical data failed:', err)
-      return []
-    }
-  }
-
-  /**
-   * Place Test / Paper Order to verify broker routing pipeline
-   */
-  public async placeTestOrder(params: {
-    symbol: string
-    transactionType: 'BUY' | 'SELL'
-    quantity: number
-    orderType: 'MARKET' | 'LIMIT'
-    price?: number
-  }): Promise<{ success: boolean; orderId: string; message: string }> {
-    const creds = this.loadCredentials()
-    if (!this.isConfigured()) {
-      return {
-        success: false,
-        orderId: '',
-        message: 'Cannot execute order: Alice Blue App ID, API Secret, or Registered IP is missing.',
-      }
-    }
-
-    if (!creds?.sessionToken) {
-      return {
-        success: false,
-        orderId: '',
-        message: 'Session token expired or missing. Please generate a session token first.',
-      }
-    }
-
-    // Simulate order execution acknowledgment from A3 Open API
-    const simulatedOrderId = `AB_${Date.now().toString().slice(-8)}`
-    return {
-      success: true,
-      orderId: simulatedOrderId,
-      message: `Order submitted successfully via Alice Blue ANT A3 (${creds.environment.toUpperCase()} Mode). Order ID: ${simulatedOrderId}`,
-    }
-  }
-
-  /**
-   * WebSocket implementation for Alice Blue Market Data
-   */
-  public async connectWebSocket(): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      return // Already connected
-    }
-
-    const creds = this.loadCredentials()
-    if (!creds || !creds.userId || !creds.sessionToken) {
-      console.error('[AliceBlue WS] Cannot connect. Missing credentials.')
-      return
-    }
-
-    return new Promise(async (resolve, reject) => {
-      try {
-        this.ws = new WebSocket('wss://ws1.aliceblueonline.com/NorenWS/')
-
-        this.ws.onopen = async () => {
-          console.log('[AliceBlue WS] Connected')
-          
-          // Connect with raw session token
-          const connectPayload = {
-            susertoken: creds.sessionToken,
-            t: 'c',
-            actid: `${creds.userId}_API`,
-            uid: `${creds.userId}_API`,
-            source: 'API'
-          }
-          this.ws?.send(JSON.stringify(connectPayload))
-          
-          // Start heartbeat
-          this.heartbeatInterval = setInterval(() => {
-            if (this.ws?.readyState === WebSocket.OPEN) {
-              this.ws.send(JSON.stringify({ k: "", t: "h" }))
-            }
-          }, 45000)
-        }
-
-        this.ws.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            if (data.t === 'ck' && data.s === 'OK') {
-              resolve()
-            }
-            this.wsCallbacks.forEach(cb => cb(data))
-          } catch (e) {
-            console.error('[AliceBlue WS] Error parsing message', e)
-          }
-        }
-
-        this.ws.onerror = (error) => {
-          console.error('[AliceBlue WS] Error:', error)
-          reject(error)
-        }
-
-        this.ws.onclose = () => {
-          console.log('[AliceBlue WS] Disconnected')
-          if (this.heartbeatInterval) clearInterval(this.heartbeatInterval)
-        }
-      } catch (err) {
-        reject(err)
-      }
-    })
-  }
-
-  public disconnectWebSocket() {
-    if (this.ws) {
-      this.ws.close()
-      this.ws = null
-    }
-    if (this.heartbeatInterval) {
-      clearInterval(this.heartbeatInterval)
-      this.heartbeatInterval = null
-    }
-  }
-
-  public subscribeMarketData(tokens: string) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        k: tokens,
-        t: 't'
-      }))
-    }
-  }
-
-  public subscribeDepthData(tokens: string) {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify({
-        k: tokens,
-        t: 'd'
-      }))
-    }
-  }
-
-  public onWsMessage(callback: (data: any) => void) {
-    this.wsCallbacks.add(callback)
-    return () => {
-      this.wsCallbacks.delete(callback)
     }
   }
 }
