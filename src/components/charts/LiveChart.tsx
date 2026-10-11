@@ -97,6 +97,7 @@ export default function LiveChart({
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const dataRef = useRef<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>>([])
   const fitNextRef = useRef(true)
+  const atRightRef = useRef(true) // user is watching the newest bar -> follow it
   const rafRef = useRef(0)
 
   const [timeframe, setTimeframe] = useState<Timeframe>(defaultTimeframe)
@@ -137,7 +138,12 @@ export default function LiveChart({
 
     const chart = createChart(el, {
       autoSize: true,
-      layout: { background: { type: ColorType.Solid, color: '#0A0D16' }, textColor: '#94A3B8', fontSize: 11 },
+      layout: {
+        background: { type: ColorType.Solid, color: '#0A0D16' },
+        textColor: '#94A3B8',
+        fontSize: 11,
+        attributionLogo: false, // hide the library's branding badge
+      },
       grid: { vertLines: { color: '#131A2B' }, horzLines: { color: '#131A2B' } },
       crosshair: { mode: CrosshairMode.Normal },
       rightPriceScale: { borderColor: '#1A2234', scaleMargins: { top: 0.08, bottom: 0.18 } },
@@ -165,7 +171,14 @@ export default function LiveChart({
     candleRef.current = candles
     volumeRef.current = volume
 
-    chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleOverlay)
+    const onRange = () => {
+      const ts = chart.timeScale()
+      const range = ts.getVisibleLogicalRange()
+      const n = dataRef.current.length
+      atRightRef.current = !range || !n || range.to >= n - 3
+      scheduleOverlay()
+    }
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRange)
     const onCross = (p: MouseEventParams) => {
       const d: any = p.seriesData.get(candles)
       setHover(d && typeof d.open === 'number' ? { open: d.open, high: d.high, low: d.low, close: d.close } : null)
@@ -210,6 +223,8 @@ export default function LiveChart({
     if (fitNextRef.current) {
       chartRef.current?.timeScale().fitContent()
       fitNextRef.current = false
+    } else if (atRightRef.current) {
+      chartRef.current?.timeScale().scrollToRealTime()
     }
     scheduleOverlay()
   }, [scheduleOverlay])
@@ -276,6 +291,8 @@ export default function LiveChart({
         last.close = q.ltp
         series.update({ time: last.time as UTCTimestamp, open: last.open, high: last.high, low: last.low, close: last.close })
       }
+      // Keep the newest candle in view when the user is watching the right edge
+      if (atRightRef.current) chartRef.current?.timeScale().scrollToRealTime()
       scheduleOverlay()
     })
     return unsubscribe

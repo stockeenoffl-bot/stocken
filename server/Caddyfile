@@ -1,0 +1,6 @@
+# Caddy terminates HTTPS (free Let's Encrypt cert) and forwards to the gateway.
+# DNS: in Hostinger hPanel -> zonaledge.com -> DNS / Nameservers -> add
+#   Type: A    Name: api    Target: 147.93.19.24    TTL: 14400
+api.zonaledge.com {
+	reverse_proxy 127.0.0.1:8787
+}

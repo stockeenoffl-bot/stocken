@@ -1,0 +1,21 @@
+[Unit]
+Description=Zonal Edge Alice Blue gateway
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=zonaledge
+Group=zonaledge
+WorkingDirectory=/opt/zonaledge-gateway
+EnvironmentFile=/opt/zonaledge-gateway/.env
+ExecStart=/usr/bin/node /opt/zonaledge-gateway/server.mjs
+Restart=always
+RestartSec=3
+# hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ReadWritePaths=/opt/zonaledge-gateway/data
+
+[Install]
+WantedBy=multi-user.target

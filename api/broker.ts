@@ -8,6 +8,7 @@
  *    hammer the broker API.
  *
  * Public (GET)   : ?action=status | quotes | history | search
+ *                  All market data comes from Alice Blue only - no third-party fallbacks.
  * Admin  (POST)  : action = generate-session | set-session | disconnect | diagnostics
  *
  * The session is persisted in the Supabase table `broker_session`
@@ -28,14 +29,13 @@ interface Inst {
   exchange: 'NSE' | 'BSE'
   token: string
   kind: 'index' | 'equity'
-  yahoo: string[]
 }
 
-const idx = (symbol: string, name: string, exchange: 'NSE' | 'BSE', token: string, yahoo: string[]): Inst => ({
-  symbol, name, exchange, token, kind: 'index', yahoo,
+const idx = (symbol: string, name: string, exchange: 'NSE' | 'BSE', token: string, _yahoo?: string[]): Inst => ({
+  symbol, name, exchange, token, kind: 'index',
 })
 const eq = (symbol: string, name: string, token: string): Inst => ({
-  symbol, name, exchange: 'NSE', token, kind: 'equity', yahoo: [`${symbol}.NS`],
+  symbol, name, exchange: 'NSE', token, kind: 'equity',
 })
 
 const INSTRUMENTS: Inst[] = [
@@ -94,7 +94,6 @@ function resolveInstrument(raw: string): Inst | null {
       exchange,
       token: parts[2],
       kind: 'equity',
-      yahoo: [`${symbol}${exchange === 'BSE' ? '.BO' : '.NS'}`],
     }
   }
   let key = text.toUpperCase()
@@ -409,64 +408,13 @@ async function aliceHistory(inst: Inst, tf: string, range: string): Promise<{ ca
 }
 
 // ---------------------------------------------------------------------------
-// Yahoo fallback (used only when Alice Blue cannot serve: no session, BSE, etc.)
-// ---------------------------------------------------------------------------
-const YAHOO_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-  Accept: 'application/json',
-}
-
-async function yahooChart(ySymbol: string, query: string): Promise<any> {
-  for (const host of ['query1', 'query2']) {
-    try {
-      const r = await fetch(`https://${host}.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ySymbol)}?${query}`, { headers: YAHOO_HEADERS })
-      if (!r.ok) continue
-      const j: any = await r.json()
-      if (j?.chart?.result?.[0]) return j.chart.result[0]
-    } catch { /* try next host */ }
-  }
-  return null
-}
-
-async function yahooHistory(inst: Inst, tf: string, range: string): Promise<{ candles: Candle[]; clamped: boolean } | null> {
-  const interval: Record<string, string> = { '1m': '1m', '5m': '5m', '15m': '15m', '30m': '30m', '1H': '60m', '4H': '60m', D: '1d', W: '1wk', M: '1mo' }
-  const maxDays: Record<string, number> = { '1m': 7, '5m': 59, '15m': 59, '30m': 59, '60m': 729 }
-  const yi = interval[tf]
-  let days = RANGE_DAYS[range] || 7
-  let clamped = false
-  const cap = maxDays[yi]
-  if (cap && days > cap) { days = cap; clamped = true }
-  if (range === '1D') days = 5
-  const now = Math.floor(Date.now() / 1000)
-  for (const ySym of inst.yahoo) {
-    const res = await yahooChart(ySym, `interval=${yi}&period1=${now - days * 86400}&period2=${now + 3600}&includePrePost=false`)
-    const ts: number[] = res?.timestamp
-    const q = res?.indicators?.quote?.[0]
-    if (!ts || !q) continue
-    const rows: Candle[] = []
-    for (let i = 0; i < ts.length; i++) {
-      if (q.open[i] == null || q.high[i] == null || q.low[i] == null || q.close[i] == null) continue
-      rows.push({ time: ts[i], open: q.open[i], high: q.high[i], low: q.low[i], close: q.close[i], volume: q.volume?.[i] || 0 })
-    }
-    if (!rows.length) continue
-    let candles = aggregate(rows, tf)
-    if (range === '1D' && MINUTES[tf] && candles.length) {
-      const lastDay = Math.floor((candles[candles.length - 1].time + IST) / 86400)
-      candles = candles.filter((c) => Math.floor((c.time + IST) / 86400) === lastDay)
-    }
-    return { candles, clamped }
-  }
-  return null
-}
-
-// ---------------------------------------------------------------------------
 // Quotes
 // ---------------------------------------------------------------------------
 interface Quote {
   symbol: string; name: string; exchange: string; kind: string
   ltp: number; change: number; changePercent: number
   open: number; high: number; low: number; prevClose: number; volume: number
-  ts: number; source: 'aliceblue' | 'yahoo'
+  ts: number; source: 'aliceblue'
 }
 
 async function aliceQuotes(list: Inst[]): Promise<Quote[]> {
@@ -496,35 +444,14 @@ async function aliceQuotes(list: Inst[]): Promise<Quote[]> {
   return out
 }
 
-async function yahooQuote(inst: Inst): Promise<Quote | null> {
-  for (const ySym of inst.yahoo) {
-    const res = await yahooChart(ySym, 'interval=1m&range=1d')
-    const m = res?.meta
-    if (!m?.regularMarketPrice) continue
-    const ltp = num(m.regularMarketPrice)
-    const prevClose = num(m.chartPreviousClose ?? m.previousClose) || ltp
-    const change = +(ltp - prevClose).toFixed(2)
-    return {
-      symbol: inst.symbol, name: inst.name, exchange: inst.exchange, kind: inst.kind,
-      ltp, change, changePercent: prevClose ? +((change / prevClose) * 100).toFixed(2) : 0,
-      open: num(m.regularMarketOpen) || ltp, high: num(m.regularMarketDayHigh) || ltp, low: num(m.regularMarketDayLow) || ltp,
-      prevClose, volume: num(m.regularMarketVolume), ts: Date.now(), source: 'yahoo',
-    }
-  }
-  return null
-}
-
 async function getQuotes(list: Inst[]): Promise<Quote[]> {
   const key = 'q:' + list.map((i) => i.symbol).sort().join(',')
-  return cached(key, isMarketOpen() ? 1000 : 15000, async () => {
-    let quotes: Quote[] = []
-    try { quotes = await aliceQuotes(list) } catch { /* fall through to yahoo */ }
-    const missing = list.filter((i) => !quotes.find((q) => q.symbol === i.symbol))
-    if (missing.length) {
-      const extra = await Promise.all(missing.map((i) => yahooQuote(i).catch(() => null)))
-      quotes.push(...(extra.filter(Boolean) as Quote[]))
+  return cached(key, isMarketOpen() ? 900 : 15000, async () => {
+    try {
+      return await aliceQuotes(list)
+    } catch {
+      return []
     }
-    return list.map((i) => quotes.find((q) => q.symbol === i.symbol)).filter(Boolean) as Quote[]
   })
 }
 
@@ -660,6 +587,14 @@ export default async function handler(req: any, res: any) {
       const list = symbols.map(resolveInstrument).filter(Boolean) as Inst[]
       if (!list.length) return res.status(400).json({ error: 'No valid symbols' })
       const quotes = await getQuotes(list)
+      if (!quotes.length) {
+        const s = await loadSession()
+        return res.status(502).json({
+          error: sessionUsable(s)
+            ? 'Alice Blue returned no quotes for these symbols.'
+            : "Alice Blue is not connected. Admin: open the Broker page and generate today's session.",
+        })
+      }
       res.setHeader('Cache-Control', 'public, s-maxage=1, stale-while-revalidate=3')
       return res.status(200).json({ quotes, marketOpen: isMarketOpen(), serverTime: Date.now() })
     }
@@ -680,16 +615,19 @@ export default async function handler(req: any, res: any) {
       const ttl = intraday ? (open ? 8000 : 300000) : open ? 60000 : 3600000
       const key = `h:${inst.symbol}:${tf}:${range}`
       const result = await cached(key, ttl, async () => {
-        let source: 'aliceblue' | 'yahoo' = 'aliceblue'
         let out: { candles: Candle[]; clamped: boolean } | null = null
         try { out = await aliceHistory(inst, tf, range) } catch { out = null }
-        if (!out || !out.candles.length) {
-          source = 'yahoo'
-          out = await yahooHistory(inst, tf, range).catch(() => null)
-        }
-        return { source, candles: out?.candles || [], clamped: out?.clamped || false }
+        return { source: 'aliceblue' as const, candles: out?.candles || [], clamped: out?.clamped || false }
       })
-      if (!result.candles.length) return res.status(502).json({ error: 'No market data available right now', source: result.source })
+      if (!result.candles.length) {
+        const s = await loadSession()
+        return res.status(502).json({
+          error: sessionUsable(s)
+            ? `Alice Blue returned no ${tf} history for ${inst.symbol}.`
+            : "Alice Blue is not connected. Admin: open the Broker page and generate today's session.",
+          source: 'aliceblue',
+        })
+      }
       res.setHeader('Cache-Control', `public, s-maxage=${Math.floor(ttl / 1000)}, stale-while-revalidate=${Math.floor(ttl / 500)}`)
       return res.status(200).json({
         symbol: inst.symbol, name: inst.name, exchange: inst.exchange,

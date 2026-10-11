@@ -11,7 +11,11 @@ import { isMarketOpenIST, type RangeKey, type Timeframe } from '@/lib/candles'
 
 export type { RangeKey, Timeframe }
 
-const API = '/api/broker'
+// Gateway base URL. In production this points at the VPS (server/server.mjs),
+// e.g. https://gw.zonaledge.com - set VITE_BROKER_API_URL in Vercel/.env.
+// Falls back to the local /api/broker handler (vite dev / Vercel serverless).
+const API = ((import.meta.env.VITE_BROKER_API_URL as string | undefined) || '/api/broker').replace(/\/+$/, '')
+const REMOTE = /^https?:\/\//.test(API) // a real gateway URL => can stream
 
 export interface Candle {
   time: number // unix seconds (UTC)
@@ -36,7 +40,7 @@ export interface AliceBlueQuote {
   prevClose: number
   volume: number
   ts: number
-  source: 'aliceblue' | 'yahoo'
+  source: 'aliceblue'
 }
 
 export interface GatewayStatus {
@@ -59,7 +63,7 @@ export interface HistoryResponse {
   exchange: string
   timeframe: Timeframe
   range: RangeKey
-  source: 'aliceblue' | 'yahoo'
+  source: 'aliceblue'
   clamped: boolean
   marketOpen: boolean
   serverTime: number
@@ -189,14 +193,18 @@ class AliceBlueService {
   }
 
   /**
-   * Live quote stream (adaptive polling through the cached gateway).
-   * ~1.5s while the market is open, 20s when closed, paused in hidden tabs.
+   * Live quote stream.
+   *  1. Preferred: Server-Sent Events pushed by the VPS gateway (ticks arrive
+   *     continuously while the market is open - chart updates as prices move).
+   *  2. Fallback: adaptive polling (1.5s open / 20s closed) if SSE is unavailable.
    */
   public subscribeQuotes(symbols: string[], cb: QuoteListener): () => void {
     let stopped = false
     let timer: ReturnType<typeof setTimeout> | null = null
+    let es: EventSource | null = null
+    let sseFailures = 0
 
-    const tick = async () => {
+    const poll = async () => {
       if (stopped) return
       let delay = isMarketOpenIST() ? 1500 : 20000
       if (typeof document !== 'undefined' && document.hidden) {
@@ -210,13 +218,53 @@ class AliceBlueService {
           delay = 8000
         }
       }
-      if (!stopped) timer = setTimeout(tick, delay)
+      if (!stopped) timer = setTimeout(poll, delay)
     }
-    void tick()
+
+    const startPolling = () => {
+      if (stopped || timer) return
+      void poll()
+    }
+
+    const startStream = () => {
+      if (stopped || !REMOTE || typeof EventSource === 'undefined') return false
+      try {
+        es = new EventSource(`${API}?action=stream&symbols=${encodeURIComponent(symbols.join(','))}`)
+        es.addEventListener('quotes', (ev: MessageEvent) => {
+          if (stopped) return
+          sseFailures = 0
+          try {
+            const data = JSON.parse(ev.data)
+            cb(data.quotes || [], { marketOpen: Boolean(data.marketOpen) })
+          } catch { /* ignore malformed frame */ }
+        })
+        es.onerror = () => {
+          sseFailures += 1
+          if (sseFailures >= 3) {
+            try { es?.close() } catch { /* ignore */ }
+            es = null
+            startPolling() // gateway unreachable / proxy without SSE -> poll
+          }
+        }
+        return true
+      } catch {
+        return false
+      }
+    }
+
+    // One immediate fetch so the UI is populated instantly, then stream.
+    void this.getQuotes(symbols)
+      .then((r) => { if (!stopped) cb(r.quotes, { marketOpen: r.marketOpen }) })
+      .catch(() => undefined)
+      .finally(() => { if (!startStream()) startPolling() })
 
     return () => {
       stopped = true
       if (timer) clearTimeout(timer)
+      if (es) {
+        try { es.close() } catch { /* ignore */ }
+        es = null
+      }
     }
   }
 
