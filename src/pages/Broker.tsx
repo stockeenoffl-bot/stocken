@@ -267,7 +267,7 @@ SUPABASE_SERVICE_ROLE_KEY=...   (stores the daily session)`}</pre>
           <p className="leading-relaxed">
             Your login session is fine — <strong>no re-login needed</strong>. Go to{' '}
             <a href="https://a3.aliceblueonline.com" target="_blank" rel="noreferrer" className="underline text-amber-100">a3.aliceblueonline.com → My Apps</a>{' '}
-            and make sure <strong>147.93.19.24</strong> is saved as Primary IPv4 (and <strong>2a02:4780:12:d36c::1</strong> as Primary IPv6), with IP Type = Static, then press Save and wait a few minutes. Then click <strong>Refresh</strong> here.
+            and make sure <strong>Primary IPv4 = 147.93.19.24</strong> (Secondary IPv4 and IPv6 fields can be left empty — the gateway only uses IPv4), with IP Type = Static, then press Save and wait a few minutes. Then click <strong>Refresh</strong> here.
           </p>
           {status.lastError && <p className="font-mono text-[10px] text-amber-300/80">{status.lastError}</p>}
         </div>

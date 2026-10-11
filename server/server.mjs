@@ -16,6 +16,13 @@ import http from 'node:http'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import dns from 'node:dns'
+import net from 'node:net'
+
+// Alice Blue whitelists our IP. Always talk over IPv4 so the source IP Alice
+// sees is predictable (147.93.19.24) - an IPv6 route would otherwise break auth.
+dns.setDefaultResultOrder('ipv4first')
+try { if (typeof net.setDefaultAutoSelectFamily === 'function') net.setDefaultAutoSelectFamily(false) } catch { /* older node */ }
 
 // ---------------------------------------------------------------------------
 // Config
@@ -251,6 +258,9 @@ let authBlocked = false // IP whitelist / permission problem
 async function alice(route, body, s) {
   const formats = authFormatKnown ? [authFormat] : [0, 1, 2]
   let last = null
+  let sawSessionError = false
+  let sawAuthRejection = false
+
   for (const f of formats) {
     const r = await fetch(ALICE_BASE + route, {
       method: 'POST',
@@ -270,22 +280,30 @@ async function alice(route, body, s) {
       authFormat = f
       authFormatKnown = true
       authBlocked = false
+      sessionInvalid = false
       lastSessionError = ''
       return last
     }
 
-    // Session problems (daily expiry) -> caller must re-login
+    // Classify the failure but keep trying the other auth formats
     if (/session|expired|invalid.*token|token.*invalid|not.*logged|login/i.test(emsg)) {
-      sessionInvalid = true
+      sawSessionError = true
+    } else if (r.status === 401 || r.status === 403) {
+      sawAuthRejection = true
+    } else {
+      // 5xx / other - no point trying more formats
       lastSessionError = emsg || `HTTP ${r.status}`
       return last
     }
-    // Auth rejection without a session message -> IP whitelist / permissions
-    if (r.status === 401 || r.status === 403) {
-      authBlocked = true
-      lastSessionError = `${emsg || `HTTP ${r.status}`} - most likely the VPS IP is not whitelisted in Alice Blue > My Apps. The session is still valid; fix the IP and data resumes without re-login.`
-      return last
-    }
+  }
+
+  // Every auth format failed -> decide WHY (login needed vs IP blocked)
+  if (sawSessionError) {
+    sessionInvalid = true
+    lastSessionError = String(last?.json?.emsg || last?.json?.message || 'Alice Blue says the daily session is invalid/expired')
+  } else if (sawAuthRejection) {
+    authBlocked = true
+    lastSessionError = `Alice Blue rejected every auth format (HTTP ${last?.status || 401}). Most likely the VPS IP is not whitelisted in Alice Blue > My Apps. The session itself is still valid - fix the IP and data resumes without re-login.`
   }
   return last || { status: 0, ok: false, json: null, text: '' }
 }
@@ -815,6 +833,32 @@ const server = http.createServer(async (req, res) => {
         steps.push({ step: 'Alice Blue session', status: 'error', message: `Session expired/invalid ${lastSessionError ? `(${lastSessionError})` : ''}. Generate a new one.` })
       } else {
         steps.push({ step: 'Alice Blue session', status: 'success', message: `Session for ${s.userId} created ${new Date(s.createdAt).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })} IST.` })
+
+        // Raw auth-format probe: shows EXACTLY what Alice Blue replies for each
+        // header style, so a 401 is never a mystery again.
+        const variants = [
+          { name: 'Bearer userId userSession', header: `Bearer ${s.userId} ${s.userSession}` },
+          { name: 'Bearer userSession', header: `Bearer ${s.userSession}` },
+          { name: 'Bearer userId:userSession', header: `Bearer ${s.userId}:${s.userSession}` },
+        ]
+        for (const v of variants) {
+          let msg = ''
+          let status = 'error'
+          try {
+            const r = await fetch(`${ALICE_BASE}/open-api/od/ChartAPIService/chart/get/multi/ohlc`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: v.header },
+              body: JSON.stringify([{ exchange: 'NSE', token: '26000' }]),
+            })
+            const text = await r.text().catch(() => '')
+            msg = `HTTP ${r.status}: ${text.slice(0, 170)}`
+            status = r.ok ? 'success' : r.status === 401 || r.status === 403 ? 'error' : 'warning'
+          } catch (e) {
+            msg = e?.message || 'request failed'
+          }
+          steps.push({ step: `Auth probe · ${v.name}`, status, message: msg })
+        }
+
         const nifty = resolveInstrument('NIFTY 50')
         const quotes = await aliceQuotes([nifty]).catch(() => [])
         steps.push(quotes.length
