@@ -224,7 +224,9 @@ export default function Home() {
                   Live Admin Commentary ({market})
                 </span>
                 <span className="text-[9px] font-mono text-[var(--text-muted)]">
-                  Updated {new Date(liveData.lastUpdated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                  {published
+                    ? `Updated ${new Date(liveData.lastUpdated).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}`
+                    : 'Not published yet'}
                 </span>
               </div>
               <p className="text-xs leading-relaxed text-[var(--text-secondary)] whitespace-pre-wrap">
