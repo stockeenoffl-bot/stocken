@@ -507,6 +507,76 @@ function send(res, code, obj, headers = {}) {
   res.end(body)
 }
 
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))
+
+function callbackPage(ok, title, message) {
+  return `<!doctype html><html lang="en"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>${esc(title)}</title>
+<style>
+  body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0A0D16;color:#E2E8F0;font-family:system-ui,-apple-system,'Segoe UI',sans-serif}
+  .card{max-width:430px;padding:34px 28px;border-radius:16px;background:#0E1424;border:1px solid #1A2234;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.45)}
+  .icon{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:28px;font-weight:700}
+  .ok .icon{background:rgba(34,197,94,.15);color:#22C55E}
+  .bad .icon{background:rgba(239,68,68,.15);color:#EF4444}
+  h1{font-size:18px;margin:0 0 10px}
+  p{font-size:13px;line-height:1.65;color:#94A3B8;margin:0}
+  .hint{margin-top:16px;font-size:11px;color:#64748B}
+</style></head>
+<body><div class="card ${ok ? 'ok' : 'bad'}">
+  <div class="icon">${ok ? '&#10003;' : '!'}</div>
+  <h1>${esc(title)}</h1>
+  <p>${esc(message)}</p>
+  ${ok
+    ? '<p class="hint">You can close this tab and go back to the website.<br/>Live market data is now flowing to all users.</p>'
+    : '<p class="hint">Open the website &rarr; <strong>Broker</strong> page and click<br/><strong>Login to Alice Blue</strong> again for a fresh code.</p>'}
+</div></body></html>`
+}
+
+function sendHtml(res, code, html) {
+  res.writeHead(code, {
+    'Content-Type': 'text/html; charset=utf-8',
+    'Cache-Control': 'no-store',
+    'Access-Control-Allow-Origin': CORS_ORIGIN,
+  })
+  res.end(html)
+}
+
+/**
+ * Alice Blue OAuth redirect target. Register this URL in the A3 app:
+ *   https://api.zonaledge.com/callback
+ * Then "Login to Alice Blue" -> sign in -> the session is created AUTOMATICALLY
+ * here. No copy & paste.
+ */
+async function handleCallback(query, defaultUser) {
+  const authCode = String(query.authCode || query.authcode || '').trim()
+  const userId = String(query.userId || query.userid || defaultUser || '').toUpperCase().trim()
+  const apiSecret = env('ALICE_BLUE_API_SECRET')
+  const appId = env('ALICE_BLUE_APP_ID')
+  if (!apiSecret || !appId) {
+    return callbackPage(false, 'Gateway not configured', 'Set ALICE_BLUE_APP_ID and ALICE_BLUE_API_SECRET in /opt/zonaledge-gateway/.env and restart the service.')
+  }
+  if (!authCode) {
+    return callbackPage(false, 'No authorisation code', 'Alice Blue did not send an authCode back. Please use the Login button on the Broker page again.')
+  }
+  try {
+    const checkSum = crypto.createHash('sha256').update(`${userId}${authCode}${apiSecret}`).digest('hex')
+    const r = await fetch(`${ALICE_BASE}/open-api/od/v1/vendor/getUserDetails`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ checkSum }),
+    })
+    const data = await r.json().catch(() => null)
+    if (r.ok && data?.stat === 'Ok' && data?.userSession) {
+      saveSession({ userId: String(data.clientId || userId).toUpperCase(), userSession: data.userSession, createdAt: Date.now() })
+      return callbackPage(true, 'Connected to Alice Blue', "Today's live session is active. Every user now sees live market data.")
+    }
+    return callbackPage(false, 'Could not connect', `${data?.emsg || `Alice Blue returned HTTP ${r.status}`} (client: ${userId || 'unknown'})`)
+  } catch (e) {
+    return callbackPage(false, 'Connection error', e?.message || 'Unexpected error while talking to Alice Blue')
+  }
+}
+
 function parseAuthInput(input, fallbackUser) {
   let authCode = String(input || '').trim()
   let userId = fallbackUser
@@ -535,6 +605,11 @@ const server = http.createServer(async (req, res) => {
     const action = String(q.action || (req.method === 'GET' ? 'status' : ''))
 
     if (url.pathname === '/health') return send(res, 200, { ok: true, uptime: process.uptime() })
+
+    // Alice Blue OAuth redirect target - creates the session automatically
+    if (url.pathname === '/callback' || url.pathname.endsWith('/callback')) {
+      return sendHtml(res, 200, await handleCallback(q, defaultUser))
+    }
 
     // ------------------------- public -------------------------
     if (action === 'status') {

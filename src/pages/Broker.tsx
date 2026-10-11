@@ -68,6 +68,7 @@ export default function Broker() {
   const [clientId, setClientId] = useState('')
   const [manualSession, setManualSession] = useState('')
   const [showManual, setShowManual] = useState(false)
+  const [showToken, setShowToken] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [diagnostics, setDiagnostics] = useState<ConnectionDiagnostic[]>([])
   const [myIp, setMyIp] = useState<string | null>(null)
@@ -84,6 +85,26 @@ export default function Broker() {
     window.addEventListener('aliceblue-status-change', onChange)
     return () => window.removeEventListener('aliceblue-status-change', onChange)
   }, [reload])
+
+  // After clicking "Login to Alice Blue", watch for the automatic connection
+  // (the gateway's /callback creates the session) and confirm when it lands.
+  const [awaiting, setAwaiting] = useState(false)
+  useEffect(() => {
+    if (!awaiting) return
+    const id = setInterval(async () => {
+      const s = await aliceBlueService.refreshStatus()
+      if (s) setStatus(s)
+      if (s?.connected) {
+        setAwaiting(false)
+        toast.success("Alice Blue connected! Live data is now flowing to all users.")
+      }
+    }, 2500)
+    const stop = setTimeout(() => setAwaiting(false), 180000)
+    return () => {
+      clearInterval(id)
+      clearTimeout(stop)
+    }
+  }, [awaiting])
 
   const connected = Boolean(status?.connected)
   const configured = Boolean(status?.configured)
@@ -242,8 +263,10 @@ SUPABASE_SERVICE_ROLE_KEY=...   (stores the daily session)`}</pre>
       <motion.div variants={itemVariants} className="p-6 rounded-xl border bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-5">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
           <div>
-            <h3 className="text-sm font-bold text-[var(--text-primary)]">Daily Login (≈ 30 seconds)</h3>
-            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">Alice Blue sessions expire every day. Repeat this each trading morning.</p>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Daily Login (one click + your TOTP)</h3>
+            <p className="text-[11px] text-[var(--text-muted)] mt-0.5">
+              Alice Blue requires one sign-in per trading day (a broker rule for every API broker in India). After that it is automatic — no copy &amp; paste.
+            </p>
           </div>
           {connected && (
             <button onClick={handleDisconnect} disabled={busy === 'disconnect'}
@@ -257,8 +280,9 @@ SUPABASE_SERVICE_ROLE_KEY=...   (stores the daily session)`}</pre>
           <li className="flex gap-3">
             <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">1</span>
             <div className="space-y-1.5">
-              <p>Open the Alice Blue login and sign in with your client ID, password and TOTP.</p>
+              <p>Click the button and sign in with your client ID, password and TOTP.</p>
               <a href={status?.loginUrl || '#'} target="_blank" rel="noreferrer"
+                onClick={() => setAwaiting(true)}
                 className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold ${status?.loginUrl ? 'bg-[var(--accent-indigo)] text-white hover:brightness-110' : 'bg-[var(--bg-tertiary)] text-[var(--text-muted)] pointer-events-none'}`}>
                 <ExternalLink size={13} /> Login to Alice Blue <ArrowUpRight size={12} />
               </a>
@@ -266,32 +290,56 @@ SUPABASE_SERVICE_ROLE_KEY=...   (stores the daily session)`}</pre>
           </li>
           <li className="flex gap-3">
             <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">2</span>
-            <p>After login you are redirected to a URL containing <code className="px-1 rounded bg-[var(--bg-tertiary)]">authCode=…&amp;userId=…</code>. Copy the <strong>whole URL</strong> (or just the authCode).</p>
+            <div className="flex-1 space-y-2">
+              <p>That's it. Alice Blue redirects back to this site and the live session is created <strong>automatically</strong>.</p>
+              {connected ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-300">
+                  <CheckCircle2 size={13} /> Connected — live data is flowing to all users.
+                </div>
+              ) : awaiting ? (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-xs text-indigo-200">
+                  <RefreshCw size={13} className="animate-spin" /> Waiting for your Alice Blue sign-in… this page updates by itself.
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs text-[var(--text-muted)]">
+                  <Clock size={13} /> Not connected yet — click the button above. If the redirect doesn't complete, use the manual fallback below.
+                </div>
+              )}
+            </div>
           </li>
           <li className="flex gap-3">
             <span className="w-6 h-6 shrink-0 rounded-full bg-indigo-600 text-white text-[11px] font-bold flex items-center justify-center">3</span>
             <div className="flex-1 space-y-2">
-              <p>Paste it here and connect:</p>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <input value={authInput} onChange={(e) => setAuthInput(e.target.value)} placeholder="Paste redirect URL or authCode"
-                  className="flex-1 px-3 py-2 rounded-lg border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]" />
-                <input value={clientId} onChange={(e) => setClientId(e.target.value.toUpperCase())} placeholder="Client ID (if not in URL)"
-                  className="sm:w-48 px-3 py-2 rounded-lg border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]" />
-                <button onClick={handleGenerate} disabled={busy === 'generate' || !configured}
-                  className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:brightness-110 disabled:opacity-50">
-                  {busy === 'generate' ? <RefreshCw size={13} className="animate-spin" /> : <Plug size={13} />}
-                  Connect & go live
-                </button>
-              </div>
-              <p className="text-[10px] text-[var(--text-muted)]">The auth code is single-use. If it fails, log in again for a fresh one.</p>
+              <button onClick={() => setShowManual((v) => !v)} className="text-[11px] text-[var(--accent-indigo)] hover:underline">
+                {showManual ? 'Hide' : 'Manual fallback — paste the authCode URL yourself'}
+              </button>
+              {showManual && (
+                <>
+                  <p className="text-[11px] text-[var(--text-muted)]">
+                    If you land on a page showing <code className="px-1 rounded bg-[var(--bg-tertiary)]">authCode=…</code>, copy the whole address and paste it here:
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <input value={authInput} onChange={(e) => setAuthInput(e.target.value)} placeholder="Paste redirect URL or authCode"
+                      className="flex-1 px-3 py-2 rounded-lg border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]" />
+                    <input value={clientId} onChange={(e) => setClientId(e.target.value.toUpperCase())} placeholder="Client ID (if not in URL)"
+                      className="sm:w-48 px-3 py-2 rounded-lg border text-xs font-mono outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]" />
+                    <button onClick={handleGenerate} disabled={busy === 'generate' || !configured}
+                      className="flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-emerald-600 text-white hover:brightness-110 disabled:opacity-50">
+                      {busy === 'generate' ? <RefreshCw size={13} className="animate-spin" /> : <Plug size={13} />}
+                      Connect & go live
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-[var(--text-muted)]">The auth code is single-use. If it fails, log in again for a fresh one.</p>
+                </>
+              )}
             </div>
           </li>
         </ol>
 
-        <button onClick={() => setShowManual((v) => !v)} className="text-[11px] text-[var(--accent-indigo)] hover:underline">
-          {showManual ? 'Hide' : 'Already have a userSession token? Paste it manually'}
+        <button onClick={() => setShowToken((v) => !v)} className="text-[11px] text-[var(--accent-indigo)] hover:underline">
+          {showToken ? 'Hide' : 'Already have a userSession token? Paste it manually'}
         </button>
-        {showManual && (
+        {showToken && (
           <div className="flex flex-col sm:flex-row gap-2">
             <input value={clientId} onChange={(e) => setClientId(e.target.value.toUpperCase())} placeholder="Client ID"
               className="sm:w-40 px-3 py-2 rounded-lg border text-xs font-mono bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)]" />
@@ -306,7 +354,7 @@ SUPABASE_SERVICE_ROLE_KEY=...   (stores the daily session)`}</pre>
       <motion.div variants={itemVariants} className="p-5 rounded-xl border bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-2">
         <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2"><Globe size={15} className="text-indigo-400" /> Static IP requirement</h3>
         <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-          Alice Blue only accepts API calls from the IP registered in the A3 portal{status?.ipAddress ? <> (currently <code className="px-1 rounded bg-[var(--bg-tertiary)]">{status.ipAddress}</code>)</> : null}. Because market data is fetched by the <em>server</em>, that registered IP must be your server's outbound IP. On serverless hosts (Vercel) outbound IPs are dynamic — if diagnostics report rejected requests, run the gateway on a VPS/static-IP proxy and register that IP.
+          Alice Blue only accepts API calls from the IP registered in the A3 portal. All market data is fetched by <strong>the VPS gateway</strong>, so the registered IP must be the VPS IP (147.93.19.24){status?.ipAddress ? <> — currently saved in the gateway config as <code className="px-1 rounded bg-[var(--bg-tertiary)]">{status.ipAddress}</code></> : null}. If Alice Blue rejects requests after a VPS migration, register the new IP in My Apps and update the gateway .env.
         </p>
         <div className="flex items-center gap-2 text-xs">
           <button onClick={detectIp} className="px-2.5 py-1 rounded border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white">Show my browser's IP</button>
