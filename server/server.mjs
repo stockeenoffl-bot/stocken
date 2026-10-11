@@ -208,6 +208,8 @@ function loadSession() {
 function saveSession(s) {
   memSession = s
   sessionInvalid = false
+  authBlocked = false
+  authFormatKnown = false
   lastSessionError = ''
   cache.clear()
   fs.mkdirSync(DATA_DIR, { recursive: true })
@@ -217,6 +219,8 @@ function saveSession(s) {
 function clearSession() {
   memSession = null
   sessionInvalid = false
+  authBlocked = false
+  authFormatKnown = false
   lastSessionError = ''
   cache.clear()
   try { fs.rmSync(SESSION_FILE(), { force: true }) } catch { /* ignore */ }
@@ -229,24 +233,61 @@ function sessionUsable(s) {
 // ---------------------------------------------------------------------------
 // Alice Blue
 // ---------------------------------------------------------------------------
+// How the bearer token is formatted. Auto-detected on the first successful call,
+// so small doc differences don't break the feed.
+let authFormat = 0 // 0: "userId token", 1: "token", 2: "userId:token"
+let authFormatKnown = false
+function authHeader(s) {
+  if (authFormat === 1) return `Bearer ${s.userSession}`
+  if (authFormat === 2) return `Bearer ${s.userId}:${s.userSession}`
+  return `Bearer ${s.userId} ${s.userSession}`
+}
+
+// True when Alice is rejecting because of the DAILY session (needs re-login).
+// A bare 401/403 usually means the VPS IP is not whitelisted yet - that is NOT
+// a session problem and must not require another login.
+let authBlocked = false // IP whitelist / permission problem
+
 async function alice(route, body, s) {
-  const r = await fetch(ALICE_BASE + route, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${s.userId} ${s.userSession}`,
-    },
-    body: JSON.stringify(body),
-  })
-  const text = await r.text()
-  let json = null
-  try { json = JSON.parse(text) } catch { /* html / empty */ }
-  const emsg = String(json?.emsg || json?.message || json?.reason || '')
-  if (r.status === 401 || r.status === 403 || /session|invalid.*token|not.*authori/i.test(emsg)) {
-    sessionInvalid = true
-    lastSessionError = emsg || `HTTP ${r.status}`
+  const formats = authFormatKnown ? [authFormat] : [0, 1, 2]
+  let last = null
+  for (const f of formats) {
+    const r = await fetch(ALICE_BASE + route, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: f === 1 ? `Bearer ${s.userSession}` : f === 2 ? `Bearer ${s.userId}:${s.userSession}` : `Bearer ${s.userId} ${s.userSession}`,
+      },
+      body: JSON.stringify(body),
+    })
+    const text = await r.text()
+    let json = null
+    try { json = JSON.parse(text) } catch { /* html / empty */ }
+    const emsg = String(json?.emsg || json?.message || json?.reason || '')
+    last = { status: r.status, ok: r.ok, json, text }
+
+    if (r.ok && r.status < 400) {
+      authFormat = f
+      authFormatKnown = true
+      authBlocked = false
+      lastSessionError = ''
+      return last
+    }
+
+    // Session problems (daily expiry) -> caller must re-login
+    if (/session|expired|invalid.*token|token.*invalid|not.*logged|login/i.test(emsg)) {
+      sessionInvalid = true
+      lastSessionError = emsg || `HTTP ${r.status}`
+      return last
+    }
+    // Auth rejection without a session message -> IP whitelist / permissions
+    if (r.status === 401 || r.status === 403) {
+      authBlocked = true
+      lastSessionError = `${emsg || `HTTP ${r.status}`} - most likely the VPS IP is not whitelisted in Alice Blue > My Apps. The session is still valid; fix the IP and data resumes without re-login.`
+      return last
+    }
   }
-  return { status: r.status, ok: r.ok, json, text }
+  return last || { status: 0, ok: false, json: null, text: '' }
 }
 
 let preferredUnit = 'ms'
@@ -615,12 +656,13 @@ const server = http.createServer(async (req, res) => {
     if (action === 'status') {
       const s = loadSession()
       const usable = sessionUsable(s)
+      const blocked = usable && authBlocked
       return send(res, 200, {
         configured: Boolean(apiSecret && appId),
         appId,
         ipAddress,
-        connected: usable,
-        reason: usable ? 'ok' : !s ? 'no-session' : sessionInvalid ? 'expired' : 'stale',
+        connected: usable && !blocked,
+        reason: usable ? (blocked ? 'blocked' : 'ok') : !s ? 'no-session' : sessionInvalid ? 'expired' : 'stale',
         lastError: lastSessionError || undefined,
         persisted: true,
         marketOpen: isMarketOpen(),
@@ -639,7 +681,9 @@ const server = http.createServer(async (req, res) => {
         const s = loadSession()
         return send(res, 502, {
           error: sessionUsable(s)
-            ? 'Alice Blue returned no quotes for these symbols.'
+            ? authBlocked
+              ? 'Alice Blue is rejecting requests (IP not whitelisted yet). The session is fine - admin: whitelist the VPS IP in Alice Blue My Apps.'
+              : 'Alice Blue returned no quotes for these symbols.'
             : 'Alice Blue is not connected. Admin: open Broker and generate today\'s session.',
         })
       }
@@ -668,7 +712,9 @@ const server = http.createServer(async (req, res) => {
         const s = loadSession()
         return send(res, 502, {
           error: sessionUsable(s)
-            ? `Alice Blue returned no ${tf} history for ${inst.symbol}.`
+            ? authBlocked
+              ? 'Alice Blue is rejecting requests (IP not whitelisted yet). The session is fine - admin: whitelist the VPS IP in Alice Blue My Apps.'
+              : `Alice Blue returned no ${tf} history for ${inst.symbol}.`
             : 'Alice Blue is not connected. Admin: open Broker and generate today\'s session.',
           source: 'aliceblue',
         })

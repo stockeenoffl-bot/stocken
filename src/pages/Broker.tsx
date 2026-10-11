@@ -213,7 +213,15 @@ export default function Broker() {
             <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Live Feed</span>
             <span className="text-xs font-bold flex items-center gap-1.5 text-[var(--text-primary)]">
               <span className={`w-2 h-2 rounded-full ${connected ? 'bg-emerald-400 animate-pulse' : configured ? 'bg-amber-400' : 'bg-rose-400'}`} />
-              {connected ? 'Connected · serving all users' : configured ? (status?.reason === 'expired' ? 'Session expired' : 'Login needed today') : 'Server keys missing'}
+              {connected
+                ? 'Connected · serving all users'
+                : configured
+                ? status?.reason === 'expired'
+                  ? 'Session expired — log in again'
+                  : status?.reason === 'blocked'
+                  ? 'Session OK · IP not whitelisted'
+                  : 'Login needed today'
+                : 'Server keys missing'}
             </span>
           </div>
         </div>
@@ -250,6 +258,18 @@ export default function Broker() {
 ALICE_BLUE_API_SECRET=...
 ALICE_BLUE_USER_ID=your client id (e.g. AB123456)
 SUPABASE_SERVICE_ROLE_KEY=...   (stores the daily session)`}</pre>
+        </div>
+      )}
+
+      {configured && status?.reason === 'blocked' && (
+        <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/10 text-xs text-amber-200 space-y-1">
+          <div className="font-bold flex items-center gap-1.5"><AlertCircle size={14} /> Alice Blue is rejecting requests — IP not whitelisted</div>
+          <p className="leading-relaxed">
+            Your login session is fine — <strong>no re-login needed</strong>. Go to{' '}
+            <a href="https://a3.aliceblueonline.com" target="_blank" rel="noreferrer" className="underline text-amber-100">a3.aliceblueonline.com → My Apps</a>{' '}
+            and make sure <strong>147.93.19.24</strong> is saved as Primary IPv4 (and <strong>2a02:4780:12:d36c::1</strong> as Primary IPv6), with IP Type = Static, then press Save and wait a few minutes. Then click <strong>Refresh</strong> here.
+          </p>
+          {status.lastError && <p className="font-mono text-[10px] text-amber-300/80">{status.lastError}</p>}
         </div>
       )}
 
