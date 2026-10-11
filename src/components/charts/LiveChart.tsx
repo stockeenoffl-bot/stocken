@@ -690,12 +690,30 @@ export default function LiveChart({
           )}
 
           {error && !loading && (
-            <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0A0D16]/85">
-              <div className="max-w-sm text-center space-y-3 p-4">
-                <AlertTriangle className="mx-auto text-amber-400" size={28} />
-                <p className="text-sm font-semibold text-white">Live data unavailable</p>
-                <p className="text-xs text-slate-400">{error}</p>
-                <button onClick={() => setReloadKey((k) => k + 1)} className="px-3 py-1.5 rounded-md bg-indigo-600 text-white text-xs font-bold hover:brightness-110">
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0A0D16]/90">
+              <div className="max-w-md text-center space-y-3 p-5">
+                <AlertTriangle className="mx-auto text-amber-400" size={30} />
+                <p className="text-sm font-semibold text-white">Live market data is not available yet</p>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  {/not connected|session/i.test(error)
+                    ? 'The Alice Blue feed is offline. This is fixed by the admin — no action needed from you.'
+                    : error}
+                </p>
+                {editable ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <a href="/broker" className="px-4 py-2 rounded-md bg-indigo-600 text-white text-xs font-bold hover:brightness-110">
+                      Open Broker → Connect Alice Blue
+                    </a>
+                    <p className="text-[10px] text-slate-500">
+                      Steps: register the VPS IP in Alice Blue → "Login to Alice Blue" → paste the redirect URL → Connect.
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-[11px] text-slate-500">
+                    Charts will appear automatically once the admin connects the live feed.
+                  </p>
+                )}
+                <button onClick={() => setReloadKey((k) => k + 1)} className="px-3 py-1.5 rounded-md bg-[#141B2E] border border-[#1A2234] text-slate-300 text-xs font-semibold hover:text-white">
                   Try again
                 </button>
               </div>
