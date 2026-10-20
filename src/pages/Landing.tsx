@@ -375,53 +375,22 @@ export default function Landing() {
 
       {/* Not a Signal Service */}
       <section className="py-16 px-6">
-        <div className="max-w-5xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+        <div className="max-w-3xl mx-auto text-center">
           <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
             <h2 className="text-2xl md:text-3xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
               Not a Signal Service.<br />
               We Provide <span style={{ color: 'var(--accent-indigo)' }}>Clarity.</span>
             </h2>
-            <div className="rounded-xl border p-6" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}>
+            <div className="rounded-xl border p-6 max-w-xl mx-auto" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}>
               <div className="text-3xl mb-3" style={{ color: 'var(--accent-indigo)' }}>"</div>
               <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
                 We don't predict the market. We prepare you for it.
               </p>
             </div>
-          </motion.div>
-          <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
-            transition={{ delay: 0.2 }}
-            className="rounded-xl border overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
-          >
-            <div className="grid grid-cols-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
-              <div className="px-4 py-3 text-xs font-medium" style={{ color: 'var(--text-muted)' }}></div>
-              <div className="px-4 py-3 text-xs font-semibold text-center" style={{ color: 'var(--text-muted)' }}>Others</div>
-              <div className="px-4 py-3 text-xs font-semibold text-center" style={{ color: 'var(--accent-indigo)' }}>Zonal Edge</div>
-            </div>
-            {[
-              { feature: 'Buy / Sell Signals', others: false, us: true },
-              { feature: 'Fake Targets', others: false, us: true },
-              { feature: '100% Accuracy Claims', others: false, us: true },
-              { feature: 'Market Structure', others: false, us: true },
-              { feature: 'Risk Management', others: false, us: true },
-              { feature: 'Decision Clarity', others: false, us: true },
-            ].map((row, i) => (
-              <div key={i} className="grid grid-cols-3 border-b last:border-b-0" style={{ borderColor: 'var(--border-subtle)' }}>
-                <div className="px-4 py-3 text-xs" style={{ color: 'var(--text-secondary)' }}>{row.feature}</div>
-                <div className="px-4 py-3 flex justify-center">
-                  {row.others ? <Check size={14} style={{ color: 'var(--success)' }} /> : <X size={14} style={{ color: 'var(--danger)' }} />}
-                </div>
-                <div className="px-4 py-3 flex justify-center">
-                  {row.us ? <Check size={14} style={{ color: 'var(--success)' }} /> : <X size={14} style={{ color: 'var(--danger)' }} />}
-                </div>
-              </div>
-            ))}
           </motion.div>
         </div>
       </section>

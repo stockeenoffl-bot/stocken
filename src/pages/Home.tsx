@@ -70,7 +70,7 @@ export default function Home() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black uppercase tracking-wider bg-rose-500 text-white px-1.5 py-0.2 rounded">
-                    LIVE ADMIN ALERT
+                    LIVE ALERT
                   </span>
                   <span className="text-xs font-bold text-white">{flashAlert.title}</span>
                 </div>
@@ -93,7 +93,7 @@ export default function Home() {
           <h1 className="text-xl font-bold text-[var(--text-primary)]">Market Outlook ({market})</h1>
           <span className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 font-bold border border-emerald-500/30">
             <Radio size={10} className="animate-pulse" />
-            LIVE ADMIN SYNCED
+            LIVE SYNCED
           </span>
           {justUpdated && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500 text-white font-bold animate-pulse">
@@ -166,9 +166,13 @@ export default function Home() {
             </div>
             <p className="text-slate-300 text-[11px] mt-0.5">
               {published ? (
-                <>Published by <strong className="text-white">{liveData.updatedBy || 'Admin'}</strong> &middot; Updates appear here automatically</>
+                (isSuperAdmin || isAdmin) ? (
+                  <>Published by <strong className="text-white">{liveData.updatedBy || 'Admin'}</strong> &middot; Updates appear here automatically</>
+                ) : (
+                  <>Official analysis is live &middot; Updates appear here automatically</>
+                )
               ) : ready ? (
-                <>No analysis published yet for {market}. It will appear here the moment the admin publishes.</>
+                <>No analysis published yet for {market}. It will appear here automatically.</>
               ) : (
                 <>Loading latest analysis…</>
               )}
@@ -191,7 +195,7 @@ export default function Home() {
             </span>
           </div>
           <span className="flex items-center gap-1 text-[10px] text-[var(--text-muted)]">
-            <Lock size={11} /> Zones & drawings are published by the admin
+            <Lock size={11} /> Zones & drawings are published live
           </span>
         </div>
 
@@ -221,7 +225,7 @@ export default function Home() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] uppercase font-bold text-[var(--accent-indigo)]">
-                  Live Admin Commentary ({market})
+                  Live Commentary ({market})
                 </span>
                 <span className="text-[9px] font-mono text-[var(--text-muted)]">
                   {published

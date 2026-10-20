@@ -19,6 +19,7 @@ import {
   Minus,
   Radio,
   RefreshCw,
+  RotateCcw,
   Search,
   Slash,
   Square,
@@ -98,6 +99,7 @@ export default function LiveChart({
   const dataRef = useRef<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>>([])
   const fitNextRef = useRef(true)
   const atRightRef = useRef(true) // user is watching the newest bar -> follow it
+  const restoringRef = useRef(false) // true while we programmatically restore the view
   const rafRef = useRef(0)
 
   const [timeframe, setTimeframe] = useState<Timeframe>(defaultTimeframe)
@@ -172,6 +174,10 @@ export default function LiveChart({
     volumeRef.current = volume
 
     const onRange = () => {
+      // Ignore the range events our own restore/fit calls generate, otherwise
+      // they would immediately flip atRightRef back to true and snap the chart
+      // to the right edge again.
+      if (restoringRef.current) return
       const ts = chart.timeScale()
       const range = ts.getVisibleLogicalRange()
       const n = dataRef.current.length
@@ -207,6 +213,16 @@ export default function LiveChart({
       prev = t
       rows.push({ time: t, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })
     }
+    const chart = chartRef.current
+    // Remember where the user is looking BEFORE setData() (which resets the scale)
+    const savedRange = chart && !fitNextRef.current ? chart.timeScale().getVisibleLogicalRange() : null
+    const savedRight = atRightRef.current
+    const oldFirstTime = dataRef.current.length ? dataRef.current[0].time : null
+
+    // setData()/fitContent()/setVisibleLogicalRange() all emit range-change
+    // events. Suppress them so our own writes cannot flip atRightRef and snap
+    // the chart back to the right edge behind the user's back.
+    restoringRef.current = true
     dataRef.current = rows
     candleRef.current?.setData(rows.map((r) => ({ time: r.time as UTCTimestamp, open: r.open, high: r.high, low: r.low, close: r.close })))
     const hasVolume = rows.some((r) => r.volume > 0)
@@ -220,12 +236,30 @@ export default function LiveChart({
         : []
     )
     if (rows.length) lastPriceRef.current = rows[rows.length - 1].close
+
     if (fitNextRef.current) {
-      chartRef.current?.timeScale().fitContent()
+      // First load / symbol or timeframe change -> show the default view
+      chart?.timeScale().fitContent()
       fitNextRef.current = false
-    } else if (atRightRef.current) {
-      chartRef.current?.timeScale().scrollToRealTime()
+      atRightRef.current = true
+    } else if (savedRight) {
+      // User was following the newest bar -> keep following it
+      atRightRef.current = true
+      chart?.timeScale().scrollToRealTime()
+    } else if (savedRange) {
+      // User panned/zoomed somewhere -> restore EXACTLY that window (no snapping back).
+      // Bars appended at the end keep their indices, so the window is still valid.
+      // If older bars were prepended, shift the window so the same candles stay put.
+      atRightRef.current = false
+      const shift = oldFirstTime !== null && rows.length && rows[0].time !== oldFirstTime
+        ? rows.findIndex((r) => r.time >= oldFirstTime)
+        : 0
+      const delta = shift > 0 ? shift : 0
+      chart?.timeScale().setVisibleLogicalRange({ from: savedRange.from + delta, to: savedRange.to + delta })
     }
+    // lightweight-charts emits range-change events on the next frame, so keep
+    // the suppression flag up until then.
+    requestAnimationFrame(() => { restoringRef.current = false })
     scheduleOverlay()
   }, [scheduleOverlay])
 
@@ -269,7 +303,9 @@ export default function LiveChart({
   // ---------------------------------------------------------------- live ticks
   useEffect(() => {
     const unsubscribe = aliceBlueService.subscribeQuotes([symbol], (quotes, m) => {
-      const q = quotes.find((x) => x.symbol === symbol) || quotes[0]
+      // NEVER fall back to another symbol's quote - that would paint NIFTY's price
+      // onto the SENSEX chart (and corrupt its candles).
+      const q = quotes.find((x) => x.symbol === symbol)
       if (!q) return
       if (lastPriceRef.current && q.ltp !== lastPriceRef.current) setTickDir(q.ltp > lastPriceRef.current ? 'up' : 'down')
       setQuote(q)
@@ -277,21 +313,29 @@ export default function LiveChart({
       const series = candleRef.current
       const data = dataRef.current
       if (!series || !data.length || !m.marketOpen || !isMarketOpenIST()) return
-      lastPriceRef.current = q.ltp
 
       const nowBucket = toChartTime(bucketStart(timeframe, Math.floor(Date.now() / 1000)))
       const last = data[data.length - 1]
+      // Guard against a bad tick (e.g. a stale/other-instrument price) blowing up the chart
+      const sane = q.ltp > 0 && last.close > 0 && Math.abs(q.ltp - last.close) / last.close < 0.15
+      if (!sane) return
+      lastPriceRef.current = q.ltp
       if (nowBucket > last.time) {
         const fresh = { time: nowBucket, open: last.close, high: Math.max(last.close, q.ltp), low: Math.min(last.close, q.ltp), close: q.ltp, volume: 0 }
         data.push(fresh)
         series.update({ time: fresh.time as UTCTimestamp, open: fresh.open, high: fresh.high, low: fresh.low, close: fresh.close })
-      } else {
+      } else if (nowBucket === last.time) {
         last.high = Math.max(last.high, q.ltp)
         last.low = Math.min(last.low, q.ltp)
         last.close = q.ltp
         series.update({ time: last.time as UTCTimestamp, open: last.open, high: last.high, low: last.low, close: last.close })
+      } else {
+        // History is ahead of the live bucket (stale/odd broker timestamps).
+        // Updating with an older time throws inside lightweight-charts and would
+        // silently kill the whole tick stream - so skip the candle write instead.
+        return
       }
-      // Keep the newest candle in view when the user is watching the right edge
+      // Keep the newest candle in view ONLY when the user is watching the right edge
       if (atRightRef.current) chartRef.current?.timeScale().scrollToRealTime()
       scheduleOverlay()
     })
@@ -501,6 +545,17 @@ export default function LiveChart({
     onViewChange?.({ timeframe: tf, range: r })
   }
 
+  /** Snap the chart back to the default view (fit all candles, follow live). */
+  const resetView = () => {
+    atRightRef.current = true
+    restoringRef.current = true
+    chartRef.current?.timeScale().fitContent()
+    fitNextRef.current = false
+    chartRef.current?.timeScale().scrollToRealTime()
+    requestAnimationFrame(() => { restoringRef.current = false })
+    scheduleOverlay()
+  }
+
   return (
     <div
       ref={rootRef}
@@ -604,8 +659,11 @@ export default function LiveChart({
               </button>
             ))}
           </div>
-          <button onClick={() => setReloadKey((k) => k + 1)} title="Reload" className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1A2234]">
+          <button onClick={() => setReloadKey((k) => k + 1)} title="Reload data" className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1A2234]">
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
+          </button>
+          <button onClick={resetView} title="Reset chart to default view" className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1A2234]">
+            <RotateCcw size={13} />
           </button>
           <button onClick={() => setFullscreen((f) => !f)} title="Fullscreen (Esc to exit)" className="p-1.5 rounded text-slate-400 hover:text-white hover:bg-[#1A2234]">
             {fullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}

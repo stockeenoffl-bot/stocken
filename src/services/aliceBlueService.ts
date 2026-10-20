@@ -206,14 +206,14 @@ class AliceBlueService {
 
     const poll = async () => {
       if (stopped) return
-      let delay = isMarketOpenIST() ? 1500 : 20000
+      let delay = isMarketOpenIST() ? 1000 : 20000
       if (typeof document !== 'undefined' && document.hidden) {
         delay = 5000
       } else {
         try {
           const r = await this.getQuotes(symbols)
           if (!stopped) cb(r.quotes, { marketOpen: r.marketOpen })
-          delay = r.marketOpen ? 1500 : 20000
+          delay = r.marketOpen ? 1000 : 20000
         } catch {
           delay = 8000
         }

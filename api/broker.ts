@@ -327,8 +327,12 @@ async function alice(path: string, body: any, s: Session) {
   return { status: r.status, ok: r.ok, json, text }
 }
 
-let preferredUnit: 'ms' | 's' = 'ms'
-let unitConfirmed = false
+// Alice Blue's history endpoint accepts either milliseconds or seconds for
+// `from`/`to` depending on the exchange. This used to be detected ONCE globally,
+// so after NSE confirmed "ms" every BSE (SENSEX) request was also sent in ms -
+// BSE then read those numbers as seconds, returned the entire archive, and the
+// chart drew "everything at once". Track the unit PER EXCHANGE instead.
+const unitByExchange = new Map<string, 'ms' | 's'>()
 
 function extractRows(json: any): Candle[] {
   const arr = Array.isArray(json?.result) ? json.result : Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : []
@@ -348,9 +352,23 @@ function extractRows(json: any): Candle[] {
   return out
 }
 
+/** Reject obviously broken payloads (all bars on one timestamp, or a span far
+ *  larger than the window we asked for) so a bad response can never be drawn. */
+function looksSane(rows: Candle[], fromSec: number, toSec: number): boolean {
+  if (!rows.length) return false
+  const times = rows.map((r) => r.time)
+  const min = Math.min(...times)
+  const max = Math.max(...times)
+  if (max <= min) return false // every candle collapsed onto one timestamp
+  const windowSec = Math.max(3600, toSec - fromSec)
+  // Allow generous slack for timezone/rounding, but not "the whole archive".
+  return max - min <= windowSec * 3 && min >= fromSec - windowSec * 3
+}
+
 async function aliceHistoryChunk(inst: Inst, resolution: '1' | 'D', fromSec: number, toSec: number, s: Session): Promise<Candle[]> {
   const exchange = inst.kind === 'index' ? `${inst.exchange}::index` : inst.exchange
-  const units: Array<'ms' | 's'> = unitConfirmed ? [preferredUnit] : [preferredUnit, preferredUnit === 'ms' ? 's' : 'ms']
+  const known = unitByExchange.get(inst.exchange)
+  const units: Array<'ms' | 's'> = known ? [known] : ['ms', 's']
   for (const unit of units) {
     const mul = unit === 'ms' ? 1000 : 1
     const res = await alice(
@@ -359,9 +377,8 @@ async function aliceHistoryChunk(inst: Inst, resolution: '1' | 'D', fromSec: num
       s
     )
     const rows = extractRows(res.json)
-    if (rows.length) {
-      preferredUnit = unit
-      unitConfirmed = true
+    if (rows.length && looksSane(rows, fromSec, toSec)) {
+      unitByExchange.set(inst.exchange, unit)
       return rows
     }
     if (sessionInvalid) break
@@ -420,28 +437,51 @@ interface Quote {
 async function aliceQuotes(list: Inst[]): Promise<Quote[]> {
   const s = await loadSession()
   if (!sessionUsable(s) || !list.length) return []
-  const res = await alice(
-    '/open-api/od/ChartAPIService/chart/get/multi/ohlc',
-    list.map((i) => ({ exchange: i.exchange, token: i.token })),
-    s
-  )
-  const rows = Array.isArray(res.json?.result) ? res.json.result : []
-  const out: Quote[] = []
-  for (const r of rows) {
-    const inst = list.find((i) => i.token === String(r.tk ?? r.token))
-    if (!inst) continue
-    const ltp = num(r.ltp ?? r.lp)
-    if (!ltp) continue
-    const prevClose = num(r.pc ?? r.prevClose ?? r.close) || ltp
-    const change = +(ltp - prevClose).toFixed(2)
-    out.push({
-      symbol: inst.symbol, name: inst.name, exchange: inst.exchange, kind: inst.kind,
-      ltp, change, changePercent: prevClose ? +((change / prevClose) * 100).toFixed(2) : 0,
-      open: num(r.open ?? r.o) || ltp, high: num(r.high ?? r.h) || ltp, low: num(r.low ?? r.l) || ltp,
-      prevClose, volume: num(r.volume ?? r.v), ts: Date.now(), source: 'aliceblue',
-    })
+
+  const fetchBatch = async (batch: Inst[]) => {
+    const res = await alice(
+      '/open-api/od/ChartAPIService/chart/get/multi/ohlc',
+      batch.map((i) => ({ exchange: i.exchange, token: i.token })),
+      s
+    )
+    const rows = Array.isArray(res.json?.result) ? res.json.result : []
+    const out: Quote[] = []
+    for (const r of rows) {
+      const token = String(r.tk ?? r.token ?? '')
+      const exch = String(r.e ?? r.exchange ?? '').toUpperCase()
+      // Match on token AND exchange so a BSE index (SENSEX) can never be
+      // mistaken for an NSE index that happens to share a token number.
+      const inst =
+        batch.find((i) => i.token === token && (!exch || i.exchange === exch)) ||
+        batch.find((i) => i.token === token)
+      if (!inst) continue
+      const ltp = num(r.ltp ?? r.lp)
+      if (!ltp) continue
+      const prevClose = num(r.pc ?? r.prevClose ?? r.close) || ltp
+      const change = +(ltp - prevClose).toFixed(2)
+      out.push({
+        symbol: inst.symbol, name: inst.name, exchange: inst.exchange, kind: inst.kind,
+        ltp, change, changePercent: prevClose ? +((change / prevClose) * 100).toFixed(2) : 0,
+        open: num(r.open ?? r.o) || ltp, high: num(r.high ?? r.h) || ltp, low: num(r.low ?? r.l) || ltp,
+        prevClose, volume: num(r.volume ?? r.v), ts: Date.now(), source: 'aliceblue',
+      })
+    }
+    return out
   }
-  return out
+
+  const quotes = await fetchBatch(list)
+  // Some exchanges (notably BSE indices) are silently dropped from a mixed
+  // batch request. Retry the missing ones one-by-one so SENSEX gets its OWN
+  // price instead of inheriting another index's quote.
+  const missing = list.filter((i) => !quotes.some((q) => q.symbol === i.symbol))
+  for (const inst of missing) {
+    if (sessionInvalid) break
+    try {
+      const single = await fetchBatch([inst])
+      quotes.push(...single)
+    } catch { /* skip */ }
+  }
+  return quotes
 }
 
 async function getQuotes(list: Inst[]): Promise<Quote[]> {

@@ -27,7 +27,7 @@ export default function LiveChartPage() {
             </span>
           </div>
           <p className="text-xs text-[var(--text-muted)] mt-0.5">
-            Real-time NSE/BSE candles from Alice Blue — every timeframe (1m to Monthly) and range (1D to 5Y). Zones and notes below are published by the admin.
+            Real-time NSE/BSE candles from Alice Blue — every timeframe (1m to Monthly) and range (1D to 5Y). Zones and notes below are published live.
           </p>
         </div>
         {hasAdminAccess ? (
@@ -36,7 +36,7 @@ export default function LiveChartPage() {
           </Link>
         ) : (
           <span className="flex items-center gap-1.5 text-[11px] text-[var(--text-muted)]">
-            <Lock size={12} /> View only — analysis is updated by the admin in real time
+            <Lock size={12} /> View only — analysis updates live
           </span>
         )}
       </div>
