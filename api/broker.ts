@@ -541,6 +541,138 @@ async function searchSymbols(q: string) {
 }
 
 // ---------------------------------------------------------------------------
+// Option chain (live Open Interest)
+// ---------------------------------------------------------------------------
+// Alice Blue serves the option chain from /obrest (NOT /open-api/od):
+//   POST /obrest/optionChain/getUnderlying     { exch }
+//   POST /obrest/optionChain/getUnderlyingExp  { underlying, exch }
+//   POST /obrest/optionChain/getOptionChain    { underlying, expiry, interval, exch }
+const OPTION_MARKETS: Record<string, { underlying: string; exch: string }> = {
+  NIFTY50: { underlying: 'NIFTY', exch: 'nse_fo' },
+  NIFTY: { underlying: 'NIFTY', exch: 'nse_fo' },
+  BANKNIFTY: { underlying: 'BANKNIFTY', exch: 'nse_fo' },
+  NIFTYBANK: { underlying: 'BANKNIFTY', exch: 'nse_fo' },
+  FINNIFTY: { underlying: 'FINNIFTY', exch: 'nse_fo' },
+  MIDCPNIFTY: { underlying: 'MIDCPNIFTY', exch: 'nse_fo' },
+  SENSEX: { underlying: 'SENSEX', exch: 'bse_fo' },
+  BANKEX: { underlying: 'BANKEX', exch: 'bse_fo' },
+}
+
+function optionMarket(raw: string) {
+  const key = String(raw || '').toUpperCase().replace(/[\s_-]/g, '')
+  return OPTION_MARKETS[key] || null
+}
+
+export interface OptionRow {
+  strike: number
+  callOI: number
+  putOI: number
+  callChange: number
+  putChange: number
+  callLtp: number
+  putLtp: number
+  callPrevOI: number
+  putPrevOI: number
+  callToken: string
+  putToken: string
+}
+
+async function aliceOptionPost(route: string, body: any) {
+  const s = await loadSession()
+  if (!sessionUsable(s)) return null
+  const res = await alice(route, body, s)
+  return res.ok ? res.json : null
+}
+
+/** The chain payload does not always carry an explicit strike field, so fall
+ *  back to the trading symbol ("NIFTY26NOV24200CE") or the display name. */
+function optionStrike(ce: any, pe: any): number {
+  for (const o of [ce, pe]) {
+    if (!o) continue
+    for (const k of ['strikePrice', 'strike_price', 'strike', 'sp', 'strikeP']) {
+      const v = num(o[k])
+      if (v > 0) return v
+    }
+  }
+  const sym = String(ce?.tradingsymbol || pe?.tradingsymbol || '')
+  const m = sym.match(/[CP](\d+(?:\.\d+)?)$/i)
+  if (m) return num(m[1])
+  const parts = String(ce?.forInsName || pe?.forInsName || '').trim().split(/\s+/)
+  for (let i = parts.length - 1; i >= 0; i--) {
+    const v = num(parts[i])
+    if (v > 0) return v
+  }
+  return 0
+}
+
+function parseOptionChain(json: any): OptionRow[] {
+  const result = Array.isArray(json?.result) ? json.result : []
+  const rows: OptionRow[] = []
+  for (const block of result) {
+    const data = Array.isArray(block?.data) ? block.data : Array.isArray(block) ? block : []
+    for (const item of data) {
+      const ce = item?.CE || item?.ce || null
+      const pe = item?.PE || item?.pe || null
+      if (!ce && !pe) continue
+      const strike = optionStrike(ce, pe)
+      if (!(strike > 0)) continue
+      const callOI = num(ce?.oi)
+      const putOI = num(pe?.oi)
+      const callPrevOI = num(ce?.pdoi)
+      const putPrevOI = num(pe?.pdoi)
+      rows.push({
+        strike,
+        callOI,
+        putOI,
+        callChange: callPrevOI ? callOI - callPrevOI : 0,
+        putChange: putPrevOI ? putOI - putPrevOI : 0,
+        callLtp: num(ce?.ltp),
+        putLtp: num(pe?.ltp),
+        callPrevOI,
+        putPrevOI,
+        callToken: String(ce?.token || ''),
+        putToken: String(pe?.token || ''),
+      })
+    }
+  }
+  return rows.sort((a, b) => a.strike - b.strike)
+}
+
+async function getOptionExpiries(market: string): Promise<string[]> {
+  const m = optionMarket(market)
+  if (!m) return []
+  return cached(`oe:${m.exch}:${m.underlying}`, 30 * 60 * 1000, async () => {
+    const json = await aliceOptionPost('/obrest/optionChain/getUnderlyingExp', { underlying: m.underlying, exch: m.exch })
+    const result = Array.isArray(json?.result) ? json.result : []
+    const list = result.flatMap((r: any) => (Array.isArray(r?.underlying_expiry) ? r.underlying_expiry : []))
+    return list.map((x: any) => String(x)).filter(Boolean)
+  })
+}
+
+async function getOptionChain(market: string, expiry?: string, interval?: number) {
+  const m = optionMarket(market)
+  if (!m) return null
+  const expiries = await getOptionExpiries(market)
+  const exp = expiry && expiries.includes(expiry) ? expiry : expiries[0]
+  if (!exp) return { underlying: m.underlying, exch: m.exch, expiry: null, expiries, rows: [] as OptionRow[] }
+
+  const ttl = isMarketOpen() ? 4000 : 60000
+  const rows = await cached(`oc:${m.exch}:${m.underlying}:${exp}:${interval || 0}`, ttl, async () => {
+    const base = { underlying: m.underlying, expiry: exp, exch: m.exch }
+    // `interval` is documented as a strike-window hint; some deployments reject
+    // it, so retry without it before giving up.
+    const attempts = interval ? [{ ...base, interval }, base] : [base]
+    for (const body of attempts) {
+      const json = await aliceOptionPost('/obrest/optionChain/getOptionChain', body)
+      const parsed = parseOptionChain(json)
+      if (parsed.length) return parsed
+    }
+    return [] as OptionRow[]
+  })
+  return { underlying: m.underlying, exch: m.exch, expiry: exp, expiries, rows }
+}
+
+// ---------------------------------------------------------------------------
 // Admin verification (Supabase JWT + profile role)
 // ---------------------------------------------------------------------------
 async function requireAdmin(req: any): Promise<{ ok: boolean; error?: string; email?: string }> {
@@ -652,7 +784,9 @@ export default async function handler(req: any, res: any) {
 
       const open = isMarketOpen()
       const intraday = !!MINUTES[tf]
-      const ttl = intraday ? (open ? 8000 : 300000) : open ? 60000 : 3600000
+      // Keep the cache short while the market is open: the chart polls every
+      // 15s, so a 3s TTL means the newest candle is at most a few seconds old.
+      const ttl = intraday ? (open ? 3000 : 300000) : open ? 15000 : 3600000
       const key = `h:${inst.symbol}:${tf}:${range}`
       const result = await cached(key, ttl, async () => {
         let out: { candles: Candle[]; clamped: boolean } | null = null
@@ -680,6 +814,49 @@ export default async function handler(req: any, res: any) {
       const results = await searchSymbols(String(query.q || ''))
       res.setHeader('Cache-Control', 'public, s-maxage=60')
       return res.status(200).json({ results })
+    }
+
+    if (action === 'option-expiries') {
+      const market = String(query.market || 'NIFTY50')
+      if (!optionMarket(market)) return res.status(400).json({ error: 'Unknown market' })
+      const expiries = await getOptionExpiries(market)
+      if (!expiries.length) {
+        const s = await loadSession()
+        return res.status(502).json({
+          error: sessionUsable(s)
+            ? 'Alice Blue returned no expiries for this market.'
+            : "Alice Blue is not connected. Admin: open the Broker page and generate today's session.",
+        })
+      }
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600')
+      return res.status(200).json({ market, expiries, serverTime: Date.now() })
+    }
+
+    if (action === 'option-chain') {
+      const market = String(query.market || 'NIFTY50')
+      if (!optionMarket(market)) return res.status(400).json({ error: 'Unknown market' })
+      const interval = Number(query.interval) || undefined
+      const chain = await getOptionChain(market, String(query.expiry || '') || undefined, interval)
+      if (!chain || !chain.rows.length) {
+        const s = await loadSession()
+        return res.status(502).json({
+          error: sessionUsable(s)
+            ? 'Alice Blue returned an empty option chain for this expiry.'
+            : "Alice Blue is not connected. Admin: open the Broker page and generate today's session.",
+          expiries: chain?.expiries || [],
+        })
+      }
+      res.setHeader('Cache-Control', 'public, s-maxage=2, stale-while-revalidate=4')
+      return res.status(200).json({
+        market,
+        underlying: chain.underlying,
+        exchange: chain.exch,
+        expiry: chain.expiry,
+        expiries: chain.expiries,
+        marketOpen: isMarketOpen(),
+        serverTime: Date.now(),
+        rows: chain.rows,
+      })
     }
 
     // ------------------------------ admin ----------------------------------

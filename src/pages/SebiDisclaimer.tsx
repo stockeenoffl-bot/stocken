@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -115,7 +115,7 @@ export default function SebiDisclaimer() {
                   <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Individual traders incurred net losses</div>
                 </div>
                 <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-rose-500/20 text-center">
-                  <div className="text-xl font-extrabold text-rose-400">₹1,25,000</div>
+                  <div className="text-xl font-extrabold text-rose-400">â‚¹1,25,000</div>
                   <div className="text-[10px] text-[var(--text-muted)] mt-0.5">Average net loss per loss-maker</div>
                 </div>
                 <div className="p-3 rounded-lg bg-[var(--bg-secondary)] border border-rose-500/20 text-center">
@@ -153,7 +153,7 @@ export default function SebiDisclaimer() {
           </div>
           <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
             <p>
-              All materials published on Zonal Edge — including daily market structure analysis for NIFTY 50 and SENSEX, supply and demand zones, Open Interest (OI) heatmaps, candlestick charting patterns, invalidation levels, live market charts, and educational modules — are developed solely for <strong>educational, informational, and theoretical study purposes</strong>.
+              All materials published on Zonal Edge â€” including daily market structure analysis for NIFTY 50 and SENSEX, supply and demand zones, Open Interest (OI) heatmaps, candlestick charting patterns, invalidation levels, live market charts, and educational modules â€” are developed solely for <strong>educational, informational, and theoretical study purposes</strong>.
             </p>
             <p>
               Any price levels, support/resistance zones, or directional biases discussed on the platform represent historical market structure analysis and mathematical models. They should never be treated as trading tips, buy/sell signals, or solicitation to invest capital.
@@ -243,10 +243,10 @@ export default function SebiDisclaimer() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="mailto:compliance@zonaledge.in"
+              href="mailto:support@zonaledge.com"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent-indigo)] transition-colors"
             >
-              <PhoneCall size={14} /> compliance@zonaledge.in
+              <PhoneCall size={14} /> support@zonaledge.com
             </a>
             <Link
               to="/contact"
@@ -261,7 +261,7 @@ export default function SebiDisclaimer() {
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 Zonal Edge. All rights reserved.</p>
+          <p>Â© 2025 Zonal Edge. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

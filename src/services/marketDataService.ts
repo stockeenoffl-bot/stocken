@@ -1,8 +1,14 @@
 import { supabase } from '@/lib/supabase'
-import { aliceBlueService, type Candle, type HistoryResponse } from '@/services/aliceBlueService'
+import {
+  aliceBlueService,
+  type Candle,
+  type HistoryResponse,
+  type OptionChainResponse,
+  type OptionChainRow,
+} from '@/services/aliceBlueService'
 import type { RangeKey, Timeframe } from '@/lib/candles'
 
-export type { Candle, RangeKey, Timeframe }
+export type { Candle, RangeKey, Timeframe, OptionChainResponse, OptionChainRow }
 
 export interface OIData {
   strike: number
@@ -29,9 +35,38 @@ class MarketDataService {
     return (await this.getHistory(symbol, timeframe, range)).candles
   }
 
-  // --- OPTION CHAIN (admin maintained, stored in Supabase) ---
+  // --- OPTION CHAIN ---
 
+  /** Live option chain straight from Alice Blue (Open Interest, LTP, changes). */
+  async getLiveOptionChain(market: string, expiry?: string, interval?: number): Promise<OptionChainResponse> {
+    return aliceBlueService.getOptionChain(market, expiry, interval)
+  }
+
+  async getOptionExpiries(market: string): Promise<string[]> {
+    return aliceBlueService.getOptionExpiries(market)
+  }
+
+  /**
+   * Option chain for the OI page.
+   * Live Alice Blue data is authoritative; the admin-maintained Supabase table is
+   * only used when the broker feed is unavailable, so the page never goes blank.
+   */
   async getOptionChain(symbol: string): Promise<OIData[]> {
+    try {
+      const live = await aliceBlueService.getOptionChain(symbol)
+      if (live?.rows?.length) {
+        return live.rows.map((r) => ({
+          strike: r.strike,
+          callOI: r.callOI,
+          putOI: r.putOI,
+          callChange: r.callChange,
+          putChange: r.putChange,
+        }))
+      }
+    } catch {
+      /* fall through to the stored snapshot */
+    }
+
     try {
       const { data, error } = await supabase
         .from('options_data')
@@ -41,19 +76,7 @@ class MarketDataService {
 
       if (error) throw error
 
-      if (!data || data.length === 0) {
-        const quotes = await aliceBlueService.getQuotes([symbol]).catch(() => null)
-        const step = symbol === 'NIFTY 50' || symbol === 'NIFTY50' ? 50 : 100
-        const spot = quotes?.quotes?.[0]?.ltp
-        const basePrice = spot ? Math.round(spot / step) * step : symbol === 'NIFTY 50' || symbol === 'NIFTY50' ? 24200 : 79500
-        return Array.from({ length: 15 }).map((_, i) => ({
-          strike: basePrice - 7 * step + i * step,
-          callOI: 0,
-          putOI: 0,
-          callChange: 0,
-          putChange: 0,
-        }))
-      }
+      if (!data || data.length === 0) return []
 
       return data.map((d: any) => ({
         strike: Number(d.strike_price),

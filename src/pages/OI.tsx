@@ -1,18 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   BookOpen,
   Loader2,
-  Play
+  Play,
+  Radio,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { marketDataService } from '@/services/marketDataService'
-import type { OIData } from '@/services/marketDataService'
+import type { OIData, OptionChainRow } from '@/services/marketDataService'
+import { aliceBlueService } from '@/services/aliceBlueService'
+import { isMarketOpenIST } from '@/lib/candles'
 import { toast } from 'sonner'
 import {
   ResponsiveContainer,
-  BarChart,
+  ComposedChart,
   Bar,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -59,7 +65,7 @@ export default function OI() {
   // OI Change States
   const [mode, setMode] = useState<'live' | 'historical'>('live')
   const [market, setMarket] = useState('NIFTY')
-  const [interval, setInterval] = useState('5 min')
+  const [interval, setIntervalValue] = useState('5 min')
   const [showGraph, setShowGraph] = useState(false)
   const [showPositional, setShowPositional] = useState(false)
 
@@ -76,48 +82,218 @@ export default function OI() {
   const [rawOiData, setRawOiData] = useState<OIData[]>([])
   const [saving, setSaving] = useState(false)
 
-  // Mock Data for OI Change Table
-  const oiChangeData: OiChangeRow[] = [
-    { date: '17-02-2025', time: '11:13:00', dhb: null, changeCallOi: 10336050, changePutOi: 16314675, diffOi: 5978625, directionChange: -24.53, changeDirection: -1943700, totalCallLtpChg: 3217.6, cepeLtpChg: -1031.95, putLtpChg: -359.1, totalPutLtp: 2465.25, netPcr: 1.58, dhbDiffOi: null, sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '11:10:00', dhb: null, changeCallOi: 10246275, changePutOi: 18168600, diffOi: 7922325, directionChange: -22.21, changeDirection: -2261550, totalCallLtpChg: 3488.2, cepeLtpChg: -761.35, putLtpChg: -325.25, totalPutLtp: 2228.5, netPcr: 1.77, dhbDiffOi: null, sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '11:05:00', dhb: null, changeCallOi: 9413700, changePutOi: 19597575, diffOi: 10183875, directionChange: -3.86, changeDirection: -409050, totalCallLtpChg: 3757.9, cepeLtpChg: -491.65, putLtpChg: -182.15, totalPutLtp: 2101.9, netPcr: 2.08, dhbDiffOi: null, sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '11:00:00', dhb: null, changeCallOi: 9128475, changePutOi: 19721400, diffOi: 10592925, directionChange: 3.98, changeDirection: 405375, totalCallLtpChg: 3883.25, cepeLtpChg: -366.3, putLtpChg: -153.95, totalPutLtp: 2004.75, netPcr: 2.16, dhbDiffOi: 'D.H.B.', sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '10:55:00', dhb: null, changeCallOi: 9436275, changePutOi: 19623825, diffOi: 10187550, directionChange: 10.93, changeDirection: 1004175, totalCallLtpChg: 4228.4, cepeLtpChg: -21.15, putLtpChg: 8.3, totalPutLtp: 1821.85, netPcr: 2.08, dhbDiffOi: 'D.H.B.', sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '10:50:00', dhb: 'D.H.B. (22916.15)', changeCallOi: 9512625, changePutOi: 18696000, diffOi: 9183375, directionChange: 29.24, changeDirection: 2077425, totalCallLtpChg: 4158.2, cepeLtpChg: -91.35, putLtpChg: -35.25, totalPutLtp: 1848.5, netPcr: 1.97, dhbDiffOi: 'D.H.B.', sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '10:45:00', dhb: 'D.H.B. (22907.25)', changeCallOi: 10109025, changePutOi: 17214975, diffOi: 7105950, directionChange: 14.73, changeDirection: 912075, totalCallLtpChg: 4277.75, cepeLtpChg: 28.2, putLtpChg: 5.65, totalPutLtp: 1769.85, netPcr: 1.70, dhbDiffOi: 'D.H.B.', sentiment: 'Bullish' },
-    { date: '17-02-2025', time: '10:40:00', dhb: 'D.H.B. (22874.75)', changeCallOi: 10075575, changePutOi: 16269450, diffOi: 6193875, directionChange: 2606.82, changeDirection: 5965050, totalCallLtpChg: 3913.55, cepeLtpChg: -336.0, putLtpChg: -178.9, totalPutLtp: 1949.5, netPcr: 1.61, dhbDiffOi: 'D.H.B.', sentiment: 'Bullish' }
-  ]
-
   const [oiAnalysisChartData, setOiAnalysisChartData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [chainRows, setChainRows] = useState<OptionChainRow[]>([])
+  const [expiries, setExpiries] = useState<string[]>([])
+  const [expiry, setExpiry] = useState<string>('')
+  const [spot, setSpot] = useState<number | null>(null)
+  const [lastUpdated, setLastUpdated] = useState<number | null>(null)
+  const [chainError, setChainError] = useState<string | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const [strikeWindow, setStrikeWindow] = useState(10)
+  const [showAllStrikes, setShowAllStrikes] = useState(false)
+  const mountedRef = useRef(true)
+  // Rolling snapshots of the live chain -> powers the "OI Change" table.
+  const snapshotsRef = useRef<Array<{ ts: number; rows: OptionChainRow[] }>>([])
+  const [snapshotCount, setSnapshotCount] = useState(0)
+
+  /**
+   * OI Change table, derived from consecutive live snapshots of the chain.
+   * Each row compares a snapshot with the one before it, so the numbers are
+   * real broker deltas instead of the old hard-coded sample rows.
+   */
+  const oiChangeData: OiChangeRow[] = useMemo(() => {
+    const snaps = snapshotsRef.current
+    if (snaps.length < 2) return []
+    const rows: OiChangeRow[] = []
+    for (let i = snaps.length - 1; i > 0 && rows.length < 25; i--) {
+      const cur = snaps[i]
+      const prev = snaps[i - 1]
+      const prevByStrike = new Map(prev.rows.map((r) => [r.strike, r]))
+      let changeCallOi = 0
+      let changePutOi = 0
+      let totalCallLtpChg = 0
+      let putLtpChg = 0
+      let callOI = 0
+      let putOI = 0
+      for (const r of cur.rows) {
+        const p = prevByStrike.get(r.strike)
+        if (!p) continue
+        changeCallOi += r.callOI - p.callOI
+        changePutOi += r.putOI - p.putOI
+        totalCallLtpChg += r.callLtp - p.callLtp
+        putLtpChg += r.putLtp - p.putLtp
+        callOI += r.callOI
+        putOI += r.putOI
+      }
+      const diffOi = changePutOi - changeCallOi
+      const netPcr = callOI ? putOI / callOI : 0
+      const d = new Date(cur.ts)
+      rows.push({
+        date: d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }).replace(/\//g, '-'),
+        time: d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false }),
+        dhb: null,
+        changeCallOi,
+        changePutOi,
+        diffOi,
+        directionChange: changeCallOi ? +((diffOi / Math.abs(changeCallOi)) * 100).toFixed(2) : 0,
+        changeDirection: diffOi,
+        totalCallLtpChg: +totalCallLtpChg.toFixed(2),
+        cepeLtpChg: +(totalCallLtpChg + putLtpChg).toFixed(2),
+        putLtpChg: +putLtpChg.toFixed(2),
+        totalPutLtp: +putOI.toFixed(2),
+        netPcr: +netPcr.toFixed(2),
+        dhbDiffOi: null,
+        sentiment: diffOi > 0 ? 'Bullish' : diffOi < 0 ? 'Bearish' : 'Neutral',
+      })
+    }
+    return rows
+  }, [snapshotCount, chainRows])
 
   useEffect(() => {
-    async function fetchOiData() {
-      try {
-        setLoading(true)
-        const data = await marketDataService.getOptionChain(analysisIndex)
-        
-        setRawOiData(data)
-        
-        // Format for Recharts
-        const chartData = data.map(d => ({
-          strike: d.strike.toLocaleString('en-IN'),
-          CallOI: d.callOI / 100000, // Convert to Lakhs for chart visibility
-          PutOI: d.putOI / 100000,
+    mountedRef.current = true
+    return () => { mountedRef.current = false }
+  }, [])
+
+  const loadChain = useCallback(async (opts: { silent?: boolean } = {}) => {
+    if (!opts.silent) setLoading(true)
+    else setRefreshing(true)
+    try {
+      const res = await marketDataService.getLiveOptionChain(analysisIndex, expiry || undefined)
+      if (!mountedRef.current) return
+      setChainRows(res.rows)
+      setExpiries(res.expiries)
+      if (res.expiry && res.expiry !== expiry) setExpiry(res.expiry)
+      setLastUpdated(res.serverTime || Date.now())
+      setChainError(null)
+
+      // Keep a rolling window of snapshots (one per ~minute) for the change table.
+      const ts = res.serverTime || Date.now()
+      const snaps = snapshotsRef.current
+      if (!snaps.length || ts - snaps[snaps.length - 1].ts >= 55000) {
+        snaps.push({ ts, rows: res.rows })
+        if (snaps.length > 120) snaps.shift()
+        setSnapshotCount(snaps.length)
+      }
+      setRawOiData(
+        res.rows.map((r) => ({
+          strike: r.strike,
+          callOI: r.callOI,
+          putOI: r.putOI,
+          callChange: r.callChange,
+          putChange: r.putChange,
         }))
-        
-        setOiAnalysisChartData(chartData)
-      } catch (err) {
-        console.error('Failed to fetch OI data', err)
-      } finally {
+      )
+    } catch (err: any) {
+      if (!mountedRef.current) return
+      const raw = String(err?.message || '')
+      setChainError(
+        /method not allowed|unknown action|404/i.test(raw)
+          ? 'The market-data gateway does not support the option chain yet. Deploy the updated /api/broker (or server/server.mjs) to the VPS.'
+          : /not connected|session|502/i.test(raw)
+          ? 'Alice Blue is offline. The admin needs to connect the broker feed — showing the last saved snapshot meanwhile.'
+          : raw || 'Could not load the live option chain'
+      )
+      // Broker feed down -> fall back to the admin-maintained snapshot.
+      const stored = await marketDataService.getOptionChain(analysisIndex).catch(() => [])
+      if (!mountedRef.current) return
+      setChainRows(
+        stored.map((d) => ({
+          strike: d.strike,
+          callOI: d.callOI,
+          putOI: d.putOI,
+          callChange: d.callChange,
+          putChange: d.putChange,
+          callLtp: 0,
+          putLtp: 0,
+          callPrevOI: 0,
+          putPrevOI: 0,
+          callToken: '',
+          putToken: '',
+        }))
+      )
+      setRawOiData(stored)
+    } finally {
+      if (mountedRef.current) {
         setLoading(false)
+        setRefreshing(false)
       }
     }
-    
-    if (activeMainTab === 'oiAnalysis') {
-      fetchOiData()
+  }, [analysisIndex, expiry])
+
+  // Live chain: load on mount / market change, then poll (fast while the market
+  // is open so OI is never more than a few seconds behind the broker). Both tabs
+  // share the same feed - the OI Change table is built from these snapshots.
+  useEffect(() => {
+    void loadChain()
+    const id = setInterval(() => {
+      if (document.hidden) return
+      void loadChain({ silent: true })
+    }, isMarketOpenIST() ? 5000 : 60000)
+    return () => clearInterval(id)
+  }, [loadChain])
+
+  // Spot price for the reference line + metrics banner
+  useEffect(() => {
+    const symbol = analysisIndex === 'NIFTY50' ? 'NIFTY 50' : analysisIndex === 'NIFTYBANK' ? 'BANKNIFTY' : analysisIndex
+    const unsubscribe = aliceBlueService.subscribeQuotes([symbol], (quotes) => {
+      const q = quotes.find((x) => x.symbol === symbol)
+      if (q?.ltp) setSpot(q.ltp)
+    })
+    return unsubscribe
+  }, [analysisIndex])
+
+  // Chart data: keep the strikes around spot so the chart stays readable, and
+  // never re-order/re-fit while the user is reading it.
+  const visibleRows = useMemo(() => {
+    if (!chainRows.length) return []
+    if (showAllStrikes || !spot) return chainRows
+    const sorted = [...chainRows].sort((a, b) => Math.abs(a.strike - spot) - Math.abs(b.strike - spot))
+    const keep = new Set(sorted.slice(0, strikeWindow * 2 + 1).map((r) => r.strike))
+    return chainRows.filter((r) => keep.has(r.strike))
+  }, [chainRows, spot, strikeWindow, showAllStrikes])
+
+  useEffect(() => {
+    setOiAnalysisChartData(
+      visibleRows.map((r) => ({
+        strike: r.strike.toLocaleString('en-IN'),
+        strikeValue: r.strike,
+        CallOI: +(r.callOI / 100000).toFixed(2),
+        PutOI: +(r.putOI / 100000).toFixed(2),
+        CallChg: +(r.callChange / 100000).toFixed(2),
+        PutChg: +(r.putChange / 100000).toFixed(2),
+        PCR: r.putOI && r.callOI ? +(r.putOI / r.callOI).toFixed(2) : 0,
+      }))
+    )
+  }, [visibleRows])
+
+  const totals = useMemo(() => {
+    const callOI = visibleRows.reduce((s, r) => s + r.callOI, 0)
+    const putOI = visibleRows.reduce((s, r) => s + r.putOI, 0)
+    return { callOI, putOI, pcr: callOI ? putOI / callOI : 0 }
+  }, [visibleRows])
+
+  const maxPain = useMemo(() => {
+    if (!visibleRows.length) return null
+    let best: { strike: number; pain: number } | null = null
+    for (const row of visibleRows) {
+      let pain = 0
+      for (const other of visibleRows) {
+        if (other.strike < row.strike) pain += other.callOI * (row.strike - other.strike)
+        if (other.strike > row.strike) pain += other.putOI * (other.strike - row.strike)
+      }
+      if (!best || pain < best.pain) best = { strike: row.strike, pain }
     }
-  }, [analysisIndex, activeMainTab])
+    return best?.strike ?? null
+  }, [visibleRows])
+
+  const spotLabel = spot ? spot.toLocaleString('en-IN', { maximumFractionDigits: 2 }) : null
+  const nearestStrikeLabel = useMemo(() => {
+    if (!spot || !visibleRows.length) return null
+    const nearest = visibleRows.reduce((a, b) => (Math.abs(b.strike - spot) < Math.abs(a.strike - spot) ? b : a))
+    return nearest.strike.toLocaleString('en-IN')
+  }, [spot, visibleRows])
 
   const formatNumber = (num: number) => {
     return new Intl.NumberFormat('en-IN').format(num)
@@ -127,15 +303,7 @@ export default function OI() {
     try {
       setSaving(true)
       await marketDataService.updateOptionChain(analysisIndex, rawOiData)
-      toast.success('Option chain updated successfully')
-      
-      // Refresh chart
-      const chartData = rawOiData.map(d => ({
-        strike: d.strike.toLocaleString('en-IN'),
-        CallOI: d.callOI / 100000,
-        PutOI: d.putOI / 100000,
-      }))
-      setOiAnalysisChartData(chartData)
+      toast.success('Option chain snapshot saved')
       setIsEditMode(false)
     } catch (err: any) {
       toast.error('Failed to save data: ' + err.message)
@@ -180,8 +348,23 @@ export default function OI() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2 text-[var(--text-muted)] text-xs">
-          <span>Last Updated: 29 Apr 2025, 11:15 AM</span>
+        <div className="flex items-center gap-3 text-[var(--text-muted)] text-xs">
+          <span className={`flex items-center gap-1.5 px-2 py-0.5 rounded-full border text-[10px] font-bold ${
+            chainError
+              ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+              : isMarketOpenIST()
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+              : 'bg-sky-500/10 border-sky-500/30 text-sky-400'
+          }`}>
+            {chainError ? <AlertTriangle size={10} /> : <Radio size={10} className={isMarketOpenIST() ? 'animate-pulse' : ''} />}
+            {chainError ? 'Stored snapshot' : isMarketOpenIST() ? 'Alice Blue · LIVE' : 'Alice Blue · Market closed'}
+          </span>
+          <span>
+            Last Updated:{' '}
+            {lastUpdated
+              ? new Date(lastUpdated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })
+              : '—'}
+          </span>
         </div>
       </motion.div>
 
@@ -238,7 +421,8 @@ export default function OI() {
                 <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Date</span>
                 <input
                   type="date"
-                  defaultValue="2025-02-17"
+                  value={new Date().toISOString().slice(0, 10)}
+                  readOnly
                   className="w-full px-3 py-1.5 rounded-md border text-xs bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-indigo)]"
                 />
               </div>
@@ -247,12 +431,14 @@ export default function OI() {
               <div className="space-y-1.5">
                 <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Expiry Date</span>
                 <select
-                  defaultValue="20-Feb-2025"
+                  value={expiry}
+                  onChange={(e) => setExpiry(e.target.value)}
                   className="w-full px-3 py-1.5 rounded-md border text-xs bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-indigo)]"
                 >
-                  <option value="20-Feb-2025">20-Feb-2025</option>
-                  <option value="27-Feb-2025">27-Feb-2025</option>
-                  <option value="06-Mar-2025">06-Mar-2025</option>
+                  {expiries.length === 0 && <option value="">—</option>}
+                  {expiries.map((x) => (
+                    <option key={x} value={x}>{x}</option>
+                  ))}
                 </select>
               </div>
 
@@ -261,7 +447,7 @@ export default function OI() {
                 <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Time Interval</span>
                 <select
                   value={interval}
-                  onChange={(e) => setInterval(e.target.value)}
+                  onChange={(e) => setIntervalValue(e.target.value)}
                   className="w-full px-3 py-1.5 rounded-md border text-xs bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] outline-none focus:border-[var(--accent-indigo)]"
                 >
                   <option value="5 min">5 min</option>
@@ -273,9 +459,11 @@ export default function OI() {
               {/* Actions */}
               <div className="flex gap-2">
                 <button
-                  className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold text-white bg-[var(--accent-indigo)] hover:brightness-110 flex items-center justify-center gap-1"
+                  onClick={() => void loadChain()}
+                  disabled={loading}
+                  className="flex-1 py-1.5 px-3 rounded-md text-xs font-semibold text-white bg-[var(--accent-indigo)] hover:brightness-110 flex items-center justify-center gap-1 disabled:opacity-60"
                 >
-                  <Play size={12} fill="#fff" />
+                  {loading ? <Loader2 size={12} className="animate-spin" /> : <Play size={12} fill="#fff" />}
                   Go
                 </button>
                 <button
@@ -290,10 +478,17 @@ export default function OI() {
             <div className="pt-3 border-t border-[var(--border-subtle)] flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="text-[10px] text-[var(--text-secondary)] space-y-1">
                 <p>
-                  <strong className="text-[var(--text-primary)]">Selected Strike Prices:</strong> 22450, 22500, 22550, 22600, 22650, 22700, 22750, 22800, 22850, 22900, 22950, 23000, 23050, 23100, 23150
+                  <strong className="text-[var(--text-primary)]">Selected Strike Prices:</strong>{' '}
+                  {visibleRows.length
+                    ? visibleRows.map((r) => r.strike.toLocaleString('en-IN')).join(', ')
+                    : '—'}
                 </p>
                 <p className="text-[var(--text-muted)]">
-                  Underlying: <strong className="text-[var(--text-primary)]">NIFTY 50 at 22806.35</strong>, Chg: <span className="text-rose-400 font-bold">-122.90 (-0.54%)</span> as on 17 Feb 2025, 11:14:00 IST
+                  Underlying: <strong className="text-[var(--text-primary)]">{analysisIndex} at {spotLabel ?? '—'}</strong>
+                  {expiry ? ` · Expiry ${expiry}` : ''}
+                  {lastUpdated
+                    ? ` as on ${new Date(lastUpdated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })} IST`
+                    : ''}
                 </p>
               </div>
 
@@ -348,6 +543,18 @@ export default function OI() {
                   </tr>
                 </thead>
                 <tbody className="text-xs">
+                  {oiChangeData.length === 0 && (
+                    <tr>
+                      <td colSpan={16} className="px-3 py-10 text-center">
+                        <p className="text-xs font-semibold text-[var(--text-primary)]">Collecting live OI snapshots…</p>
+                        <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                          {chainError
+                            ? chainError
+                            : 'The change table fills in automatically as new option-chain snapshots arrive (about once a minute).'}
+                        </p>
+                      </td>
+                    </tr>
+                  )}
                   {oiChangeData.map((row, i) => {
                     const isBullish = row.sentiment === 'Bullish'
                     const dirIsNeg = row.directionChange < 0
@@ -471,12 +678,27 @@ export default function OI() {
             {/* Spot details */}
             <div className="flex items-center gap-4 text-xs">
               <div className="flex items-center gap-1.5">
-                <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Date:</span>
-                <select className="bg-transparent border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-secondary)] outline-none">
-                  <option value="07 Jul 2026">07 Jul 2026</option>
-                  <option value="14 Jul 2026">14 Jul 2026</option>
+                <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">Expiry:</span>
+                <select
+                  value={expiry}
+                  onChange={(e) => setExpiry(e.target.value)}
+                  className="bg-transparent border border-[var(--border-subtle)] rounded px-2 py-1 text-xs text-[var(--text-secondary)] outline-none"
+                >
+                  {expiries.length === 0 && <option value="">—</option>}
+                  {expiries.map((x) => (
+                    <option key={x} value={x}>{x}</option>
+                  ))}
                 </select>
               </div>
+
+              <button
+                onClick={() => void loadChain({ silent: true })}
+                disabled={refreshing}
+                title="Refresh option chain"
+                className="p-1.5 rounded border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              >
+                <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+              </button>
 
               {isAdmin && (
                 <button
@@ -501,12 +723,14 @@ export default function OI() {
           {/* Quick Metrics Banner */}
           <motion.div
             variants={item}
-            className="grid grid-cols-3 gap-4"
+            className="grid grid-cols-2 md:grid-cols-5 gap-3"
           >
             {[
-              { label: 'Spot Price', value: '24,125.45', color: 'var(--text-primary)' },
-              { label: 'Total Calls', value: '1,394.40 L', color: 'text-rose-400' },
-              { label: 'Total Puts', value: '1,545.34 L', color: 'text-emerald-400' },
+              { label: 'Spot Price', value: spotLabel ?? '—', color: 'var(--text-primary)' },
+              { label: 'Total Call OI', value: `${(totals.callOI / 100000).toFixed(2)} L`, color: 'text-rose-400' },
+              { label: 'Total Put OI', value: `${(totals.putOI / 100000).toFixed(2)} L`, color: 'text-emerald-400' },
+              { label: 'PCR', value: totals.pcr ? totals.pcr.toFixed(2) : '—', color: 'text-[var(--accent-indigo)]' },
+              { label: 'Max Pain', value: maxPain ? maxPain.toLocaleString('en-IN') : '—', color: 'text-amber-400' },
             ].map((metric) => (
               <div key={metric.label} className="p-3 rounded-lg border bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
                 <span className="text-[9px] uppercase tracking-wider text-[var(--text-muted)] block font-bold">{metric.label}</span>
@@ -520,15 +744,48 @@ export default function OI() {
             variants={item}
             className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)]"
           >
-            <div className="h-[380px] w-full mt-2 relative">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)]">
+                {activeOiSubTab === 'pcr' ? 'Put/Call ratio by strike' : activeOiSubTab === 'maxPain' ? `Max pain ${maxPain ? maxPain.toLocaleString('en-IN') : '—'}` : activeOiSubTab === 'changeOi' ? 'Change in OI by strike' : 'Open interest by strike'}
+              </span>
+
+              <div className="flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={showAllStrikes}
+                    onChange={(e) => setShowAllStrikes(e.target.checked)}
+                    className="accent-[var(--accent-indigo)]"
+                  />
+                  All strikes
+                </label>
+                {!showAllStrikes && (
+                  <label className="flex items-center gap-1.5">
+                    Strikes each side
+                    <input
+                      type="range"
+                      min={3}
+                      max={25}
+                      value={strikeWindow}
+                      onChange={(e) => setStrikeWindow(Number(e.target.value))}
+                      className="w-24 accent-[var(--accent-indigo)]"
+                    />
+                    <span className="font-mono text-[var(--text-secondary)] w-4">{strikeWindow}</span>
+                  </label>
+                )}
+              </div>
+            </div>
+
+            <div className="h-[380px] w-full relative">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={oiAnalysisChartData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
+                <ComposedChart data={oiAnalysisChartData} margin={{ top: 20, right: 10, left: -20, bottom: 5 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(35, 42, 69, 0.4)" vertical={false} />
                   <XAxis
                     dataKey="strike"
                     tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
                     axisLine={{ stroke: 'var(--border-subtle)' }}
                     tickLine={false}
+                    interval="preserveStartEnd"
                   />
                   <YAxis
                     tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
@@ -539,40 +796,63 @@ export default function OI() {
                   <ChartTooltip
                     contentStyle={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
                     labelStyle={{ color: 'var(--text-primary)', fontWeight: 'bold' }}
+                    formatter={(value: any, name: any) => [`${value} L`, name]}
                   />
                   <Legend verticalAlign="bottom" height={36} wrapperStyle={{ fontSize: '10px' }} />
-                  
-                  {/* Spot Price vertical marker line */}
-                  <ReferenceLine
-                    x="24,100"
-                    stroke="#818CF8"
-                    strokeDasharray="4 4"
-                    label={{
-                      value: 'Spot Price: 24,125.45',
-                      position: 'top',
-                      fill: '#818CF8',
-                      fontSize: 9,
-                      fontWeight: 'bold',
-                    }}
-                  />
-                  
-                  <Bar
-                    dataKey="CallOI"
-                    name="Call OI"
-                    fill="#06B6D4" // Cyan/Teal
-                    radius={[2, 2, 0, 0]}
-                  />
-                  <Bar
-                    dataKey="PutOI"
-                    name="Put OI"
-                    fill="#F97316" // Orange/Red
-                    radius={[2, 2, 0, 0]}
-                  />
-                </BarChart>
+
+                  {/* Spot price marker - anchored to the real nearest strike */}
+                  {nearestStrikeLabel && (
+                    <ReferenceLine
+                      x={nearestStrikeLabel}
+                      stroke="#818CF8"
+                      strokeDasharray="4 4"
+                      label={{
+                        value: `Spot ${spotLabel}`,
+                        position: 'top',
+                        fill: '#818CF8',
+                        fontSize: 9,
+                        fontWeight: 'bold',
+                      }}
+                    />
+                  )}
+
+                  {activeOiSubTab === 'maxPain' && maxPain && (
+                    <ReferenceLine
+                      x={maxPain.toLocaleString('en-IN')}
+                      stroke="#F59E0B"
+                      strokeWidth={1.5}
+                      strokeDasharray="6 4"
+                      label={{ value: `Max pain ${maxPain.toLocaleString('en-IN')}`, position: 'insideTopRight', fill: '#FBBF24', fontSize: 9, fontWeight: 'bold' }}
+                    />
+                  )}
+
+                  {activeOiSubTab === 'pcr' ? (
+                    <Line type="monotone" dataKey="PCR" name="PCR" stroke="#818CF8" strokeWidth={2} dot={false} />
+                  ) : activeOiSubTab === 'changeOi' ? (
+                    <>
+                      <Bar dataKey="CallChg" name="Call OI chg" fill="#06B6D4" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="PutChg" name="Put OI chg" fill="#F97316" radius={[2, 2, 0, 0]} />
+                    </>
+                  ) : (
+                    <>
+                      <Bar dataKey="CallOI" name="Call OI" fill="#06B6D4" radius={[2, 2, 0, 0]} />
+                      <Bar dataKey="PutOI" name="Put OI" fill="#F97316" radius={[2, 2, 0, 0]} />
+                    </>
+                  )}
+                </ComposedChart>
               </ResponsiveContainer>
               {loading && !isEditMode ? (
                 <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-secondary)]/50 z-10 backdrop-blur-[1px]">
                   <Loader2 className="animate-spin text-[var(--accent-indigo)]" />
+                </div>
+              ) : null}
+              {!loading && !oiAnalysisChartData.length ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-center px-6">
+                  <AlertTriangle className="text-amber-400" size={22} />
+                  <p className="text-xs font-semibold text-[var(--text-primary)]">No option chain data</p>
+                  <p className="text-[11px] text-[var(--text-muted)] max-w-sm">
+                    {chainError || 'Alice Blue returned no strikes for this expiry.'}
+                  </p>
                 </div>
               ) : null}
             </div>
@@ -649,7 +929,11 @@ export default function OI() {
             {/* Bottom Controls Toggle */}
             <div className="mt-4 pt-3 border-t border-[var(--border-subtle)] flex items-center justify-between">
               <span className="text-[10px] text-[var(--text-muted)] font-mono">
-                Updated: Thu 02 Jul 2026 12:24:25 PM
+                Updated:{' '}
+                {lastUpdated
+                  ? new Date(lastUpdated).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true })
+                  : '—'}
+                {expiry ? ` · Expiry ${expiry}` : ''}
               </span>
 
               <div className="flex items-center gap-1.5 p-0.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">

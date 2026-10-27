@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+﻿import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
   ArrowLeft,
@@ -180,7 +180,7 @@ export default function RefundPolicy() {
               <li>Log in to your Zonal Edge account.</li>
               <li>Navigate to <strong>My Subscription</strong> in your sidebar menu.</li>
               <li>Click on <strong>Cancel Subscription</strong> or manage recurring billing.</li>
-              <li>Alternatively, email our support team at <a href="mailto:support@zonaledge.in" className="text-[var(--accent-indigo)] underline">support@zonaledge.in</a> at least 24 hours prior to your next renewal date.</li>
+              <li>Alternatively, email our support team at <a href="mailto:support@zonaledge.com" className="text-[var(--accent-indigo)] underline">support@zonaledge.com</a> at least 24 hours prior to your next renewal date.</li>
             </ol>
             <p className="text-[var(--text-muted)] pt-1">
               Upon cancellation, your Pro access will remain fully active until the end of your current paid billing period, and no further renewals will be charged.
@@ -246,10 +246,10 @@ export default function RefundPolicy() {
           </div>
           <div className="flex items-center gap-3">
             <a
-              href="mailto:support@zonaledge.in"
+              href="mailto:support@zonaledge.com"
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-primary)] hover:border-[var(--accent-indigo)] transition-colors"
             >
-              <Mail size={14} /> support@zonaledge.in
+              <Mail size={14} /> support@zonaledge.com
             </a>
             <Link
               to="/contact"
@@ -264,7 +264,7 @@ export default function RefundPolicy() {
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 Zonal Edge. All rights reserved.</p>
+          <p>Â© 2025 Zonal Edge. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

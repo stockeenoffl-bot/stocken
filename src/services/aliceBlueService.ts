@@ -85,6 +85,32 @@ export interface SymbolResult {
   ref: string
 }
 
+/** One strike of the live option chain (Open Interest from Alice Blue). */
+export interface OptionChainRow {
+  strike: number
+  callOI: number
+  putOI: number
+  callChange: number
+  putChange: number
+  callLtp: number
+  putLtp: number
+  callPrevOI: number
+  putPrevOI: number
+  callToken: string
+  putToken: string
+}
+
+export interface OptionChainResponse {
+  market: string
+  underlying: string
+  exchange: string
+  expiry: string | null
+  expiries: string[]
+  marketOpen: boolean
+  serverTime: number
+  rows: OptionChainRow[]
+}
+
 async function getJson<T>(params: Record<string, string>): Promise<T> {
   const qs = new URLSearchParams(params).toString()
   const res = await fetch(`${API}?${qs}`, { headers: { Accept: 'application/json' } })
@@ -190,6 +216,20 @@ class AliceBlueService {
   public async searchSymbols(q: string): Promise<SymbolResult[]> {
     const r = await getJson<{ results: SymbolResult[] }>({ action: 'search', q })
     return r.results
+  }
+
+  /** Expiry dates available for an option-chain market (NIFTY50, SENSEX, ...). */
+  public async getOptionExpiries(market: string): Promise<string[]> {
+    const r = await getJson<{ expiries: string[] }>({ action: 'option-expiries', market })
+    return r.expiries || []
+  }
+
+  /** Live option chain with Open Interest for one expiry. */
+  public async getOptionChain(market: string, expiry?: string, interval?: number): Promise<OptionChainResponse> {
+    const params: Record<string, string> = { action: 'option-chain', market }
+    if (expiry) params.expiry = expiry
+    if (interval) params.interval = String(interval)
+    return getJson<OptionChainResponse>(params)
   }
 
   /**

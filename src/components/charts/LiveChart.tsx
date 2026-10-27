@@ -204,6 +204,15 @@ export default function LiveChart({
   }, [scheduleOverlay])
 
   // ---------------------------------------------------------------- history
+  /**
+   * Merge a history payload into the chart.
+   *
+   * Refreshes must NOT call setData(): that resets the time scale and is what
+   * used to yank the chart back to the right edge while the user was reading an
+   * older part of the chart. Instead we only touch the bars that actually
+   * changed (series.update), and fall back to setData() when the dataset is
+   * structurally different (symbol / timeframe / range change).
+   */
   const applyHistory = useCallback((res: HistoryResponse) => {
     const rows: typeof dataRef.current = []
     let prev = -1
@@ -214,27 +223,53 @@ export default function LiveChart({
       rows.push({ time: t, open: c.open, high: c.high, low: c.low, close: c.close, volume: c.volume })
     }
     const chart = chartRef.current
-    // Remember where the user is looking BEFORE setData() (which resets the scale)
+    const series = candleRef.current
+    const volumeSeries = volumeRef.current
+    const old = dataRef.current
+
+    // Remember where the user is looking BEFORE any write.
     const savedRange = chart && !fitNextRef.current ? chart.timeScale().getVisibleLogicalRange() : null
     const savedRight = atRightRef.current
-    const oldFirstTime = dataRef.current.length ? dataRef.current[0].time : null
+    const oldFirstTime = old.length ? old[0].time : null
 
-    // setData()/fitContent()/setVisibleLogicalRange() all emit range-change
-    // events. Suppress them so our own writes cannot flip atRightRef and snap
-    // the chart back to the right edge behind the user's back.
+    // A refresh is "incremental" when the existing bars are still a prefix of
+    // the new payload (same start, only appended/updated bars). Then we can
+    // update in place and the visible range is never touched.
+    const incremental =
+      old.length > 0 &&
+      rows.length >= old.length &&
+      rows[0].time === old[0].time &&
+      rows[old.length - 1].time === old[old.length - 1].time
+
     restoringRef.current = true
     dataRef.current = rows
-    candleRef.current?.setData(rows.map((r) => ({ time: r.time as UTCTimestamp, open: r.open, high: r.high, low: r.low, close: r.close })))
-    const hasVolume = rows.some((r) => r.volume > 0)
-    volumeRef.current?.setData(
-      hasVolume
-        ? rows.map((r) => ({
-            time: r.time as UTCTimestamp,
-            value: r.volume,
-            color: r.close >= r.open ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)',
-          }))
-        : []
-    )
+
+    if (incremental && series) {
+      // Update only the bars that differ (usually just the last one or two).
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i]
+        const p = old[i]
+        if (p && p.open === r.open && p.high === r.high && p.low === r.low && p.close === r.close && p.volume === r.volume) continue
+        series.update({ time: r.time as UTCTimestamp, open: r.open, high: r.high, low: r.low, close: r.close })
+        volumeSeries?.update({
+          time: r.time as UTCTimestamp,
+          value: r.volume,
+          color: r.close >= r.open ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)',
+        })
+      }
+    } else {
+      series?.setData(rows.map((r) => ({ time: r.time as UTCTimestamp, open: r.open, high: r.high, low: r.low, close: r.close })))
+      const hasVolume = rows.some((r) => r.volume > 0)
+      volumeSeries?.setData(
+        hasVolume
+          ? rows.map((r) => ({
+              time: r.time as UTCTimestamp,
+              value: r.volume,
+              color: r.close >= r.open ? 'rgba(34,197,94,0.35)' : 'rgba(239,68,68,0.35)',
+            }))
+          : []
+      )
+    }
     if (rows.length) lastPriceRef.current = rows[rows.length - 1].close
 
     if (fitNextRef.current) {
@@ -242,6 +277,10 @@ export default function LiveChart({
       chart?.timeScale().fitContent()
       fitNextRef.current = false
       atRightRef.current = true
+    } else if (incremental) {
+      // Nothing to restore: the scale was never reset. Just keep following the
+      // newest bar if that is what the user was doing.
+      if (savedRight) chart?.timeScale().scrollToRealTime()
     } else if (savedRight) {
       // User was following the newest bar -> keep following it
       atRightRef.current = true
@@ -257,15 +296,22 @@ export default function LiveChart({
       const delta = shift > 0 ? shift : 0
       chart?.timeScale().setVisibleLogicalRange({ from: savedRange.from + delta, to: savedRange.to + delta })
     }
-    // lightweight-charts emits range-change events on the next frame, so keep
-    // the suppression flag up until then.
-    requestAnimationFrame(() => { restoringRef.current = false })
+    // lightweight-charts emits range-change events asynchronously, so keep the
+    // suppression flag up for a couple of frames.
+    requestAnimationFrame(() => requestAnimationFrame(() => { restoringRef.current = false }))
     scheduleOverlay()
   }, [scheduleOverlay])
 
+  // Only a genuine view change (symbol / timeframe / range) should re-fit the
+  // chart. A manual "reload" must keep the user's current position.
+  const viewKeyRef = useRef('')
   useEffect(() => {
     let cancelled = false
-    fitNextRef.current = true
+    const viewKey = `${symbol}|${timeframe}|${range}`
+    if (viewKeyRef.current !== viewKey) {
+      viewKeyRef.current = viewKey
+      fitNextRef.current = true
+    }
     setLoading(true)
     setError(null)
     marketDataService
@@ -288,7 +334,9 @@ export default function LiveChart({
     return () => { cancelled = true }
   }, [symbol, timeframe, range, reloadKey, applyHistory])
 
-  // Silent refresh while the market is open (keeps candles exact vs broker)
+  // Silent refresh while the market is open. Kept short so the newest candle
+  // never lags the broker by more than a few seconds; the gateway caches for
+  // ~8s, so this does not hammer Alice Blue.
   useEffect(() => {
     const id = setInterval(() => {
       if (document.hidden || !isMarketOpenIST()) return
@@ -296,7 +344,7 @@ export default function LiveChart({
         .getHistory(symbol, timeframe, range)
         .then((res) => applyHistory(res))
         .catch(() => undefined)
-    }, 60000)
+    }, 15000)
     return () => clearInterval(id)
   }, [symbol, timeframe, range, applyHistory])
 

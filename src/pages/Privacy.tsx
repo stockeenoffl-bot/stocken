@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -335,7 +335,7 @@ export default function Privacy() {
                 <div className="p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-1">
                   <p className="font-semibold text-[var(--text-primary)]">Data Grievance Officer</p>
                   <p className="text-[var(--text-muted)]">Platform: Zonal Edge</p>
-                  <p className="text-[var(--text-muted)]">Email: privacy@zonaledge.in</p>
+                  <p className="text-[var(--text-muted)]">Email: support@zonaledge.com</p>
                   <p className="text-[var(--text-muted)]">Location: Tamil Nadu, India</p>
                 </div>
               </div>
@@ -347,7 +347,7 @@ export default function Privacy() {
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 Zonal Edge. All rights reserved.</p>
+          <p>Â© 2025 Zonal Edge. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>

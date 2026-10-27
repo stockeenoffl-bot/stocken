@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -53,7 +53,7 @@ export default function ContactUs() {
     },
     {
       q: 'How do I cancel my 7-day trial or active subscription?',
-      a: 'You can easily cancel anytime with 1-click by visiting the My Subscription section in your dashboard, or by emailing support@zonaledge.in.',
+      a: 'You can easily cancel anytime with 1-click by visiting the My Subscription section in your dashboard, or by emailing support@zonaledge.com.',
     },
     {
       q: 'Do you provide buy/sell tips or automated copy trading?',
@@ -152,10 +152,10 @@ export default function ContactUs() {
                 For account assistance, billing questions, or platform inquiries:
               </p>
               <a
-                href="mailto:support@zonaledge.in"
+                href="mailto:support@zonaledge.com"
                 className="text-xs font-medium text-[var(--accent-indigo)] hover:underline block pt-1"
               >
-                support@zonaledge.in
+                support@zonaledge.com
               </a>
             </div>
 
@@ -168,10 +168,10 @@ export default function ContactUs() {
                 For regulatory, privacy (DPDPA), or grievance redressal requests:
               </p>
               <a
-                href="mailto:compliance@zonaledge.in"
+                href="mailto:support@zonaledge.com"
                 className="text-xs font-medium text-amber-400 hover:underline block pt-1"
               >
-                compliance@zonaledge.in
+                support@zonaledge.com
               </a>
             </div>
 
@@ -181,8 +181,8 @@ export default function ContactUs() {
               </div>
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Support Hours</h3>
               <div className="space-y-1 text-xs text-[var(--text-secondary)]">
-                <p><strong>Monday – Friday:</strong> 9:00 AM – 6:00 PM IST</p>
-                <p><strong>Saturday:</strong> 10:00 AM – 2:00 PM IST</p>
+                <p><strong>Monday â€“ Friday:</strong> 9:00 AM â€“ 6:00 PM IST</p>
+                <p><strong>Saturday:</strong> 10:00 AM â€“ 2:00 PM IST</p>
                 <p><strong>Sunday:</strong> Emergency monitoring</p>
                 <p className="text-[11px] text-[var(--text-muted)] pt-1">Typical response time: Under 2 hours during market hours.</p>
               </div>
@@ -359,7 +359,7 @@ export default function ContactUs() {
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 Zonal Edge. All rights reserved.</p>
+          <p>Â© 2025 Zonal Edge. All rights reserved.</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
