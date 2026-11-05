@@ -628,6 +628,15 @@ export default function Landing() {
                   </button>
                 ))}
               </div>
+              <div code-path="src/pages/Landing.tsx:617:15" class="flex items-center gap-2 mb-4">
+                <svg code-path="src/pages/ContactUs.tsx:148:17" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail" aria-hidden="true">
+                  <path code-path="src/pages/ContactUs.tsx:315:285" d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path>
+                  <rect code-path="src/pages/ContactUs.tsx:315:342" x="2" y="4" width="20" height="16" rx="2"></rect>
+                </svg>
+              <span code-path="src/pages/Landing.tsx:620:17" class="text-sm font-bold text-white">Contact Address:</span>
+              </div>
+
+             <p code-path="src/pages/Landing.tsx:631:25" class="text-xs mb-4 max-w-xs" style="color: var(--text-muted);">No 4: Muslim Kallarai Street, Nethaji Nagar 2, Uppalam, Puducherry 605001.</p>
             </div>
             <div>
               <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Product</h4>
