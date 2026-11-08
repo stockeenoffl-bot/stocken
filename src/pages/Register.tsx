@@ -74,25 +74,31 @@ export default function Register() {
       })
 
       if (signUpError) {
-        setError(signUpError.message)
+        if (/already registered/i.test(signUpError.message) || signUpError.status === 422) {
+          setError('This email is already registered. Please log in to your account.')
+        } else {
+          setError(signUpError.message)
+        }
         return
       }
 
       if (data.user) {
-        // Self-healing: Upsert basic profile record with chosen role
-        try {
-          await supabase.from('profiles').upsert(
-            {
-              id: data.user.id,
-              email: data.user.email,
-              full_name: fullName,
-              role: selectedRole,
-              status: 'active',
-            },
-            { onConflict: 'id' }
-          )
-        } catch (profileErr) {
-          console.warn('Profile self-healing note:', profileErr)
+        // Only write to profiles directly if session is active (to avoid 403 when unauthenticated)
+        if (data.session) {
+          try {
+            await supabase.from('profiles').upsert(
+              {
+                id: data.user.id,
+                email: data.user.email,
+                full_name: fullName,
+                role: selectedRole,
+                status: 'active',
+              },
+              { onConflict: 'id' }
+            )
+          } catch (profileErr) {
+            console.warn('Profile self-healing note:', profileErr)
+          }
         }
 
         // Check if session was returned immediately (email confirmation disabled)

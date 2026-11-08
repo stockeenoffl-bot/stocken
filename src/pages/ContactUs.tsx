@@ -314,14 +314,13 @@ export default function ContactUs() {
               </form>
             )}
           </div>
-          <div code-path="src/pages/ContactUs.tsx:178:13" class="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3">
-            <div code-path="src/pages/ContactUs.tsx:179:15" class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-mail" aria-hidden="true" code-path="src/pages/ContactUs.tsx:148:17"><path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"></path><rect x="2" y="4" width="20" height="16" rx="2"></rect></svg>
+          <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <Mail size={20} />
             </div>
-            <h3 code-path="src/pages/ContactUs.tsx:182:15" class="text-sm font-bold text-[var(--text-primary)]">Contact Address:</h3>
-            <div code-path="src/pages/ContactUs.tsx:183:15" class="space-y-1 text-xs text-[var(--text-secondary)]">
-              <p code-path="src/pages/ContactUs.tsx:184:17">
-                <strong code-path="src/pages/ContactUs.tsx:184:20">No 4: Muslim Kallarai Street, Nethaji Nagar 2, Uppalam, Puducherry 605001</strong> </p>
+            <h3 className="text-sm font-bold text-[var(--text-primary)]">Contact Address</h3>
+            <div className="space-y-1 text-xs text-[var(--text-secondary)]">
+              <p><strong>4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</strong></p>
             </div>
           </div>
         </div>
