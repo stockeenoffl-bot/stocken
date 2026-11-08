@@ -518,57 +518,234 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Pricing */}
-      <section id="pricing" className="py-16 px-6">
-        <div className="max-w-4xl mx-auto">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            className="grid lg:grid-cols-2 gap-8 items-center rounded-2xl border p-8"
-            style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
-          >
-            <div>
-              <h2 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
-                Simple Pricing.<br />
-                Serious Value.
-              </h2>
-              <p className="text-xs mb-6" style={{ color: 'var(--text-muted)' }}>Everything you need to trade with clarity.</p>
-              <div className="flex items-baseline gap-2 mb-2">
-                <span className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>₹499</span>
-                <span className="text-sm" style={{ color: 'var(--text-muted)' }}>/ month</span>
-              </div>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Cancel anytime. No hidden charges.</p>
+      {/* Pricing - All 4 Compliance Plans in INR */}
+      <section id="pricing" className="py-16 px-4 sm:px-6">
+        <div className="max-w-6xl mx-auto space-y-10">
+          <div className="text-center max-w-3xl mx-auto">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-indigo-500/10 text-[var(--accent-indigo)] border border-indigo-500/20 mb-3">
+              Transparent Indian Rupee (INR) Pricing
             </div>
-            <div>
-              <div className="rounded-xl border p-6 mb-4" style={{ backgroundColor: 'var(--bg-tertiary)', borderColor: 'var(--border-subtle)' }}>
-                <div className="text-[10px] uppercase tracking-wider mb-4 font-semibold" style={{ color: 'var(--accent-indigo)' }}>Pro Plan</div>
+            <h2 className="text-3xl md:text-4xl font-extrabold tracking-tight mb-3" style={{ color: 'var(--text-primary)' }}>
+              Simple Pricing. Serious Value.
+            </h2>
+            <p className="text-xs sm:text-sm" style={{ color: 'var(--text-muted)' }}>
+              Choose the plan that suits your trading discipline. All fees are in Indian Rupees (₹) with zero hidden deductions.
+            </p>
+          </div>
+
+          {/* 4 Products Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {/* Product 1: Free Trial – 7 Days */}
+            <div
+              className="p-6 rounded-2xl border flex flex-col justify-between transition-all"
+              style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
+            >
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400">Trial Period</span>
+                <h3 className="text-lg font-bold mt-1 mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Free Trial – 7 Days
+                </h3>
+                <div className="flex items-baseline gap-1 mb-3 pb-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>₹0</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>/ 7 days</span>
+                </div>
+                <p className="text-xs mb-4 min-h-[32px]" style={{ color: 'var(--text-secondary)' }}>
+                  Complimentary 7-day evaluation. No credit card required.
+                </p>
                 <ul className="space-y-2 mb-6">
-                  {[
-                    'Daily NIFTY & SENSEX Analysis',
-                    'Zones, Bias & Invalidation Levels',
-                    'Session Expectations',
-                    'Detailed Explanations',
-                    'History & Performance',
-                    'Priority Updates',
-                  ].map((f, i) => (
-                    <li key={i} className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                      <Check size={14} style={{ color: 'var(--success)' }} /> {f}
-                    </li>
-                  ))}
+                  <li className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <span>Access to 1 analysis/zone per day</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <span>End-of-day (EOD) full market analysis</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                    <span>NIFTY 50 & SENSEX levels</span>
+                  </li>
                 </ul>
+              </div>
+
+              <div>
                 <button
-                  onClick={() => navigate('/dashboard')}
-                  className="w-full py-2.5 rounded-md text-sm font-medium text-white transition-all duration-200 hover:brightness-110"
-                  style={{ backgroundColor: 'var(--accent-indigo)', boxShadow: '0 0 20px rgba(99,102,241,0.25)' }}
+                  onClick={() => navigate('/register')}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:brightness-110"
+                  style={{ backgroundColor: 'var(--bg-tertiary)', color: '#fff', border: '1px solid var(--border-subtle)' }}
                 >
                   Start 7-Day Free Trial
                 </button>
-                <p className="text-[10px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>No credit card required</p>
+                <p className="text-[10px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
+                  Expires automatically after 7 days
+                </p>
               </div>
-              <p className="text-[10px] text-center" style={{ color: 'var(--text-muted)' }}>Limited time early pricing</p>
             </div>
-          </motion.div>
+
+            {/* Product 2: Monthly Subscription */}
+            <div
+              className="p-6 rounded-2xl border flex flex-col justify-between transition-all relative shadow-xl"
+              style={{ backgroundColor: 'rgba(99, 102, 241, 0.08)', borderColor: 'rgba(99, 102, 241, 0.4)' }}
+            >
+              <div className="absolute -top-3 right-4">
+                <span className="px-3 py-0.5 bg-gradient-to-r from-indigo-500 to-purple-500 text-white text-[9px] font-black rounded-full uppercase tracking-wider shadow">
+                  MOST POPULAR
+                </span>
+              </div>
+
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent-indigo)]">Monthly Plan</span>
+                <h3 className="text-lg font-bold mt-1 mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Monthly Subscription
+                </h3>
+                <div className="flex items-baseline gap-1 mb-3 pb-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>₹499</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>/ 1 month</span>
+                </div>
+                <p className="text-xs mb-4 min-h-[32px]" style={{ color: 'var(--text-secondary)' }}>
+                  Full intraday and swing market structure intelligence.
+                </p>
+                <ul className="space-y-2 mb-6">
+                  {[
+                    'Multiple market zones',
+                    'Liquidation levels',
+                    'Invalidation levels',
+                    'Detailed market analysis',
+                    'Open Interest (OI) data',
+                  ].map((feat, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <button
+                  onClick={() => navigate('/register')}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold text-white transition-all hover:brightness-110 shadow-lg"
+                  style={{ backgroundColor: 'var(--accent-indigo)' }}
+                >
+                  Get Monthly Access (₹499)
+                </button>
+                <p className="text-[10px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
+                  Non-refundable upon billing
+                </p>
+              </div>
+            </div>
+
+            {/* Product 3: Quarterly Subscription */}
+            <div
+              className="p-6 rounded-2xl border flex flex-col justify-between transition-all"
+              style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
+            >
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-purple-400">Quarterly Plan</span>
+                <h3 className="text-lg font-bold mt-1 mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Quarterly Subscription
+                </h3>
+                <div className="flex items-baseline gap-1 mb-3 pb-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>₹1,299</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>/ 3 months</span>
+                </div>
+                <p className="text-xs mb-4 min-h-[32px]" style={{ color: 'var(--text-secondary)' }}>
+                  Save over 13% with 3 continuous months of market structure.
+                </p>
+                <ul className="space-y-2 mb-6">
+                  {[
+                    'Multiple market zones',
+                    'Liquidation levels',
+                    'Invalidation levels',
+                    'Detailed market analysis',
+                    'Open Interest (OI) data',
+                  ].map((feat, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <button
+                  onClick={() => navigate('/register')}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:brightness-110"
+                  style={{ backgroundColor: 'var(--bg-tertiary)', color: '#fff', border: '1px solid var(--border-subtle)' }}
+                >
+                  Get Quarterly Access (₹1,299)
+                </button>
+                <p className="text-[10px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
+                  Save ₹198 over monthly
+                </p>
+              </div>
+            </div>
+
+            {/* Product 4: Annual Subscription */}
+            <div
+              className="p-6 rounded-2xl border flex flex-col justify-between transition-all"
+              style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}
+            >
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">Annual Plan</span>
+                <h3 className="text-lg font-bold mt-1 mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Annual Subscription
+                </h3>
+                <div className="flex items-baseline gap-1 mb-3 pb-3 border-b" style={{ borderColor: 'var(--border-subtle)' }}>
+                  <span className="text-3xl font-extrabold" style={{ color: 'var(--text-primary)' }}>₹4,999</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>/ 12 months</span>
+                </div>
+                <p className="text-xs mb-4 min-h-[32px]" style={{ color: 'var(--text-secondary)' }}>
+                  Complete 1-year institutional zone access & maximum savings.
+                </p>
+                <ul className="space-y-2 mb-6">
+                  {[
+                    'Multiple market zones',
+                    'Liquidation levels',
+                    'Invalidation levels',
+                    'Detailed market analysis',
+                    'Open Interest (OI) data',
+                  ].map((feat, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                      <Check size={14} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span>{feat}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div>
+                <button
+                  onClick={() => navigate('/register')}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:brightness-110"
+                  style={{ backgroundColor: 'var(--bg-tertiary)', color: '#fff', border: '1px solid var(--border-subtle)' }}
+                >
+                  Get Annual Access (₹4,999)
+                </button>
+                <p className="text-[10px] text-center mt-2" style={{ color: 'var(--text-muted)' }}>
+                  Save ₹989 annually
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pre-Checkout Legal Terms & Policy Notices */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-1.5">
+              <span className="text-xs font-bold text-rose-400 uppercase tracking-wider">Refund Policy</span>
+              <p className="text-xs text-[var(--text-secondary)] italic leading-relaxed">
+                “All purchases and subscription payments made on Zonal Edge are final and non-refundable. Once a purchase is completed, no refunds will be issued. Users are advised to review the subscription plan and service details carefully before making a payment.”
+              </p>
+            </div>
+
+            <div className="p-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-1.5">
+              <span className="text-xs font-bold text-amber-400 uppercase tracking-wider">Cancellation Policy</span>
+              <p className="text-xs text-[var(--text-secondary)] italic leading-relaxed">
+                “Users can cancel their subscription at any time during the free trial period. Once the free trial ends and a paid subscription begins, the subscription payment is non-refundable. Users should review the applicable subscription terms before proceeding with payment.”
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -589,99 +766,115 @@ export default function Landing() {
             <p className="text-sm mb-8" style={{ color: 'var(--text-secondary)' }}>
               Join traders who trade with clarity and consistency every day.
             </p>
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex flex-wrap items-center justify-center gap-3">
               <button
-                onClick={() => navigate('/dashboard')}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-md text-sm font-medium transition-all duration-200 hover:brightness-110"
-                style={{ backgroundColor: 'var(--accent-indigo)', color: '#fff', boxShadow: '0 0 30px rgba(99,102,241,0.25)' }}
+                onClick={() => navigate('/register')}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 hover:brightness-110 shadow-lg"
+                style={{ backgroundColor: 'var(--accent-indigo)', color: '#fff' }}
               >
-                Get Today's Analysis <ArrowRight size={14} />
+                Start 7-Day Free Trial (₹0) <ArrowRight size={14} />
               </button>
-              <button
-                onClick={() => navigate('/dashboard')}
-                className="px-6 py-2.5 rounded-md border text-sm font-medium transition-all duration-200 hover:bg-[var(--bg-tertiary)]"
+              <Link
+                to="/about"
+                className="px-6 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 hover:bg-[var(--bg-tertiary)]"
                 style={{ borderColor: 'var(--border-subtle)', color: 'var(--text-secondary)' }}
               >
-                Start Free Trial
-              </button>
+                Learn About Zonal Edge
+              </Link>
             </div>
           </div>
         </motion.div>
       </section>
 
-      {/* Footer */}
+      {/* Footer - Full Compliance Details */}
       <footer className="border-t py-12 px-6" style={{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-subtle)' }}>
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-5 gap-8 mb-8">
-            <div className="md:col-span-2">
-              <div className="flex items-center gap-2 mb-4">
-                <img src="/images/ZonalEdge.jpeg" alt="Zonal Edge" className="w-6 h-6 rounded-lg object-cover" />
-                <span className="text-sm font-bold text-white">Zonal Edge</span>
+        <div className="max-w-6xl mx-auto space-y-8">
+          <div className="grid md:grid-cols-5 gap-8">
+            <div className="md:col-span-2 space-y-3">
+              <div className="flex items-center gap-2">
+                <img src="/images/ZonalEdge.jpeg" alt="Zonal Edge" className="w-7 h-7 rounded-lg object-cover" />
+                <span className="text-base font-bold text-white">Zonal Edge</span>
               </div>
-              <p className="text-xs mb-4 max-w-xs" style={{ color: 'var(--text-muted)' }}>
-                Trade with clarity, not confusion.
+              <p className="text-xs text-[var(--text-muted)] leading-relaxed max-w-sm">
+                Market analysis and educational platform designed to help traders understand market structure and key price zones in the Indian stock market (Nifty and Sensex).
               </p>
-              <div className="flex items-center gap-3">
-                {[Twitter, Youtube, Linkedin, Instagram].map((Icon, i) => (
-                  <button key={i} className="w-8 h-8 rounded-md flex items-center justify-center transition-colors hover:bg-[var(--bg-tertiary)]" style={{ color: 'var(--text-muted)' }}>
-                    <Icon size={14} />
-                  </button>
-                ))}
+              <div className="pt-1 text-[11px] text-[var(--text-muted)] space-y-1">
+                <p><strong>Trade Name:</strong> Vedgetechnologies</p>
+                <p><strong>Legal Name:</strong> Viknesh</p>
+                <p><strong>Registered Address:</strong> 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
+                <p><strong>Business Email:</strong> support@zonaledge.com</p>
               </div>
 
             </div>
+
             <div>
-              <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Product</h4>
-              <ul className="space-y-2">
-                {['Dashboard', 'Analysis', 'Features', 'Pricing', 'History'].map((l) => (
-                  <li key={l}><button onClick={() => scrollToSection(l.toLowerCase())} className="text-xs transition-colors hover:text-white" style={{ color: 'var(--text-muted)' }}>{l}</button></li>
+              <h4 className="text-xs font-semibold mb-3 text-[var(--text-primary)]">Platform</h4>
+              <ul className="space-y-2 text-xs">
+                {['Features', 'Pricing'].map((l) => (
+                  <li key={l}>
+                    <button
+                      onClick={() => scrollToSection(l.toLowerCase())}
+                      className="text-[var(--text-muted)] hover:text-white transition-colors"
+                    >
+                      {l}
+                    </button>
+                  </li>
                 ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Legal & Company</h4>
-              <ul className="space-y-2">
                 <li>
-                  <Link to="/terms" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
-                    Terms of Service
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/privacy" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
-                    Privacy Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/sebi-disclaimer" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
-                    SEBI Disclaimer
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/refund-policy" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
-                    Refund Policy
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/about" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                  <Link to="/about" className="text-[var(--text-muted)] hover:text-white transition-colors">
                     About Us
                   </Link>
                 </li>
                 <li>
-                  <Link to="/contact" className="text-xs text-[var(--text-muted)] hover:text-white transition-colors">
+                  <Link to="/contact" className="text-[var(--text-muted)] hover:text-white transition-colors">
                     Contact Us
                   </Link>
                 </li>
               </ul>
             </div>
+
             <div>
-              <h4 className="text-xs font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>Disclaimer</h4>
-              <p className="text-[10px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                This platform is for educational purposes only. We do not provide any buy/sell signals or financial advice. Please consult your financial advisor before making any investment decisions.
+              <h4 className="text-xs font-semibold mb-3 text-[var(--text-primary)]">Compliance & Legal</h4>
+              <ul className="space-y-2 text-xs">
+                <li>
+                  <Link to="/terms" className="text-[var(--text-muted)] hover:text-white transition-colors">
+                    Terms & Conditions
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/privacy" className="text-[var(--text-muted)] hover:text-white transition-colors">
+                    Privacy Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/refund-policy" className="text-[var(--text-muted)] hover:text-white transition-colors">
+                    Return & Refund Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/cancellation-policy" className="text-[var(--text-muted)] hover:text-white transition-colors">
+                    Cancellation Policy
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/sebi-disclaimer" className="text-[var(--text-muted)] hover:text-white transition-colors">
+                    SEBI Disclaimer
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="text-xs font-semibold mb-3 text-[var(--text-primary)]">Statutory Disclaimer</h4>
+              <p className="text-[10px] leading-relaxed text-[var(--text-muted)]">
+                Zonal Edge is operated by Vedgetechnologies. Intended for informational and educational purposes only. The platform does not guarantee profits or specific trading outcomes. Users are responsible for their own trading decisions and should understand market risks.
               </p>
             </div>
           </div>
-          <div className="border-t pt-6 flex items-center justify-between" style={{ borderColor: 'var(--border-subtle)' }}>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>© 2025 Zonal Edge. All rights reserved.</p>
+
+          <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[var(--text-muted)]" style={{ borderColor: 'var(--border-subtle)' }}>
+            <p>© 2026 Vedgetechnologies (Zonal Edge). All rights reserved.</p>
+            <p>https://www.zonaledge.com &middot; Puducherry, India</p>
           </div>
         </div>
       </footer>

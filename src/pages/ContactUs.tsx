@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -10,7 +10,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   ChevronDown,
-  Sparkles,
+  Building2,
+  MapPin,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -49,7 +50,7 @@ export default function ContactUs() {
     },
     {
       q: 'Can I draw on the live chart?',
-      a: 'Charts are view-only for subscribers. Our analysts draw the supply/demand zones, trendlines and levels and publish them live, so you always see the latest official analysis in real time.',
+      a: 'Charts are view-only for subscribers. Our analysts draw the supply/demand zones, trendlines, and levels and publish them live, so you always see the latest official analysis in real time.',
     },
     {
       q: 'How do I cancel my 7-day trial or active subscription?',
@@ -89,11 +90,11 @@ export default function ContactUs() {
             <Link to="/privacy" className="text-[var(--text-secondary)] hover:text-white transition-colors">
               Privacy
             </Link>
-            <Link to="/sebi-disclaimer" className="text-[var(--text-secondary)] hover:text-white transition-colors">
-              SEBI Disclaimer
-            </Link>
             <Link to="/refund-policy" className="text-[var(--text-secondary)] hover:text-white transition-colors">
               Refund Policy
+            </Link>
+            <Link to="/cancellation-policy" className="text-[var(--text-secondary)] hover:text-white transition-colors">
+              Cancellation Policy
             </Link>
             <Link to="/about" className="text-[var(--text-secondary)] hover:text-white transition-colors">
               About Us
@@ -143,6 +144,24 @@ export default function ContactUs() {
         <div className="grid lg:grid-cols-3 gap-8 items-start">
           {/* Left Column: Direct Info Cards */}
           <div className="space-y-4">
+            {/* Registered Business Office Card */}
+            <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-2.5">
+              <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-[var(--accent-indigo)] flex items-center justify-center">
+                <Building2 size={20} />
+              </div>
+              <h3 className="text-sm font-bold text-[var(--text-primary)]">Registered Office</h3>
+              <div className="text-xs text-[var(--text-secondary)] space-y-1">
+                <p className="font-semibold text-white">Vedgetechnologies</p>
+                <p className="text-[11px] text-[var(--text-muted)]">Proprietor: Viknesh</p>
+                <p className="text-[11px] leading-relaxed text-[var(--text-muted)]">
+                  4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India
+                </p>
+                <p className="text-[11px] text-[var(--accent-indigo)] pt-1">
+                  https://www.zonaledge.com
+                </p>
+              </div>
+            </div>
+
             <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3">
               <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-[var(--accent-indigo)] flex items-center justify-center">
                 <Mail size={20} />
@@ -153,7 +172,7 @@ export default function ContactUs() {
               </p>
               <a
                 href="mailto:support@zonaledge.com"
-                className="text-xs font-medium text-[var(--accent-indigo)] hover:underline block pt-1"
+                className="text-xs font-semibold text-[var(--accent-indigo)] hover:underline block pt-1"
               >
                 support@zonaledge.com
               </a>
@@ -169,7 +188,7 @@ export default function ContactUs() {
               </p>
               <a
                 href="mailto:support@zonaledge.com"
-                className="text-xs font-medium text-amber-400 hover:underline block pt-1"
+                className="text-xs font-semibold text-amber-400 hover:underline block pt-1"
               >
                 support@zonaledge.com
               </a>
@@ -181,9 +200,8 @@ export default function ContactUs() {
               </div>
               <h3 className="text-sm font-bold text-[var(--text-primary)]">Support Hours</h3>
               <div className="space-y-1 text-xs text-[var(--text-secondary)]">
-                <p><strong>Monday â€“ Friday:</strong> 9:00 AM â€“ 6:00 PM IST</p>
-                <p><strong>Saturday:</strong> 10:00 AM â€“ 2:00 PM IST</p>
-                <p><strong>Sunday:</strong> Emergency monitoring</p>
+                <p><strong>Monday – Friday:</strong> 9:00 AM – 6:00 PM IST</p>
+                <p><strong>Saturday:</strong> 10:00 AM – 2:00 PM IST</p>
                 <p className="text-[11px] text-[var(--text-muted)] pt-1">Typical response time: Under 2 hours during market hours.</p>
               </div>
             </div>
@@ -221,91 +239,77 @@ export default function ContactUs() {
             ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Your Full Name *
-                    </label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[var(--text-primary)]">Your Name *</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Rahul Sharma"
+                      placeholder="e.g. Ramesh"
                       value={form.name}
                       onChange={(e) => setForm({ ...form, name: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent-indigo)] transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Email Address *
-                    </label>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[var(--text-primary)]">Email Address *</label>
                     <input
                       type="email"
                       required
                       placeholder="you@example.com"
                       value={form.email}
                       onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent-indigo)] transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                     />
                   </div>
                 </div>
 
                 <div className="grid sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Inquiry Category
-                    </label>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[var(--text-primary)]">Inquiry Category</label>
                     <select
                       value={form.category}
                       onChange={(e) => setForm({ ...form, category: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] outline-none focus:border-[var(--accent-indigo)] transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                     >
                       <option value="general">General Inquiry</option>
                       <option value="subscription">Subscription & Billing</option>
-                      <option value="technical">Live Chart & Technical Support</option>
-                      <option value="zones">Market Zone Questions</option>
-                      <option value="compliance">SEBI Compliance / Legal</option>
+                      <option value="technical">Technical / Chart Platform</option>
+                      <option value="compliance">Compliance / Privacy Redressal</option>
                     </select>
                   </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Subject
-                    </label>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[var(--text-primary)]">Subject</label>
                     <input
                       type="text"
-                      placeholder="Brief topic summary"
+                      placeholder="Summary of inquiry"
                       value={form.subject}
                       onChange={(e) => setForm({ ...form, subject: e.target.value })}
-                      className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent-indigo)] transition-colors"
+                      className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                     />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                    Your Message *
-                  </label>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-[var(--text-primary)]">Message *</label>
                   <textarea
                     required
                     rows={5}
-                    placeholder="How can our support team assist you today? Please include any relevant details..."
+                    placeholder="Describe how we can assist you..."
                     value={form.message}
                     onChange={(e) => setForm({ ...form, message: e.target.value })}
-                    className="w-full px-3.5 py-2.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-xs text-[var(--text-primary)] placeholder-[var(--text-muted)] outline-none focus:border-[var(--accent-indigo)] transition-colors resize-y"
+                    className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)] resize-none"
                   />
                 </div>
 
                 <button
                   type="submit"
                   disabled={sending}
-                  className="w-full py-3 rounded-lg bg-[var(--accent-indigo)] text-white text-xs font-semibold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20 disabled:opacity-50 cursor-pointer"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-lg bg-[var(--accent-indigo)] text-white text-xs font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-md"
                 >
-                  {sending ? (
-                    'Transmitting...'
-                  ) : (
-                    <>
-                      <Send size={14} /> Submit Message to Support
-                    </>
-                  )}
+                  <Send size={13} />
+                  <span>{sending ? 'Sending...' : 'Send Message'}</span>
                 </button>
               </form>
             )}
@@ -324,27 +328,18 @@ export default function ContactUs() {
 
         {/* FAQs Section */}
         <div className="p-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-6">
-          <div className="text-center max-w-xl mx-auto space-y-1">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-indigo)]">
-              <Sparkles size={13} /> Quick Answers
-            </div>
-            <h3 className="text-xl font-bold text-[var(--text-primary)]">Frequently Asked Questions</h3>
-            <p className="text-xs text-[var(--text-muted)]">
-              Instant clarification on our daily analysis, charts, and billing policies.
-            </p>
-          </div>
-
-          <div className="space-y-3 max-w-3xl mx-auto">
-            {faqs.map((faq, idx) => {
-              const isOpen = activeFaq === idx
+          <h2 className="text-lg font-bold text-[var(--text-primary)]">Frequently Asked Questions</h2>
+          <div className="space-y-3">
+            {faqs.map((faq, i) => {
+              const isOpen = activeFaq === i
               return (
                 <div
-                  key={idx}
-                  className="border border-[var(--border-subtle)] rounded-xl overflow-hidden bg-[var(--bg-tertiary)] transition-all"
+                  key={i}
+                  className="rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] overflow-hidden"
                 >
                   <button
-                    onClick={() => setActiveFaq(isOpen ? null : idx)}
-                    className="w-full p-4 text-left flex items-center justify-between text-xs sm:text-sm font-semibold text-[var(--text-primary)] hover:text-white"
+                    onClick={() => setActiveFaq(isOpen ? null : i)}
+                    className="w-full p-4 text-left flex items-center justify-between text-xs font-semibold text-[var(--text-primary)]"
                   >
                     <span>{faq.q}</span>
                     <ChevronDown
@@ -368,16 +363,19 @@ export default function ContactUs() {
 
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>Â© 2025 Zonal Edge. All rights reserved.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-left">
+            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            <Link to="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors">SEBI Disclaimer</Link>
             <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
+            <Link to="/cancellation-policy" className="hover:text-white transition-colors">Cancellation Policy</Link>
+            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors">SEBI Disclaimer</Link>
             <Link to="/about" className="hover:text-white transition-colors">About Us</Link>
-            <Link to="/contact" className="hover:text-white transition-colors text-[var(--accent-indigo)]">Contact Us</Link>
-            <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
+            <Link to="/contact" className="hover:text-white transition-colors text-white font-semibold">Contact</Link>
           </div>
         </div>
       </footer>

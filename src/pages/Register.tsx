@@ -14,6 +14,8 @@ import {
   X,
   FileText,
   AlertTriangle,
+  LineChart,
+  PenSquare,
 } from 'lucide-react'
 
 export default function Register() {
@@ -24,6 +26,9 @@ export default function Register() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  // Account Role State: 'user' (Subscriber) or 'editor' (Chart Editor / Analyst)
+  const [selectedRole, setSelectedRole] = useState<'user' | 'editor'>('user')
 
   // Terms & Privacy Checkbox State
   const [agreedTerms, setAgreedTerms] = useState(false)
@@ -39,7 +44,7 @@ export default function Register() {
 
     // Validation: Terms Acceptance
     if (!agreedTerms) {
-      setError('Please review and accept the Terms of Service and Privacy Policy to proceed.')
+      setError('Please review and accept the Terms of Service, Privacy Policy, and Refund & Cancellation Policies to proceed.')
       return
     }
 
@@ -63,6 +68,7 @@ export default function Register() {
         options: {
           data: {
             full_name: fullName,
+            role: selectedRole,
           },
         },
       })
@@ -73,14 +79,14 @@ export default function Register() {
       }
 
       if (data.user) {
-        // Self-healing: Upsert basic profile record in case the Supabase database trigger was omitted
+        // Self-healing: Upsert basic profile record with chosen role
         try {
           await supabase.from('profiles').upsert(
             {
               id: data.user.id,
               email: data.user.email,
               full_name: fullName,
-              role: 'user',
+              role: selectedRole,
               status: 'active',
             },
             { onConflict: 'id' }
@@ -89,9 +95,13 @@ export default function Register() {
           console.warn('Profile self-healing note:', profileErr)
         }
 
-        // Check if email confirmation is disabled and session was returned immediately
+        // Check if session was returned immediately (email confirmation disabled)
         if (data.session) {
-          navigate('/app')
+          if (selectedRole === 'editor') {
+            navigate('/dashboard')
+          } else {
+            navigate('/app')
+          }
         } else {
           setSuccess(true)
         }
@@ -103,7 +113,7 @@ export default function Register() {
     }
   }
 
-  // Success Confirmation Screen (if email confirmation required)
+  // Success Confirmation Screen
   if (success) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)] p-4">
@@ -138,9 +148,13 @@ export default function Register() {
         className="w-full max-w-md p-6 sm:p-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-xl"
       >
         <div className="text-center mb-6">
+          <Link to="/" className="inline-flex items-center gap-2 mb-3">
+            <img src="/images/ZonalEdge.jpeg" alt="Zonal Edge" className="w-8 h-8 rounded-lg object-cover" />
+            <span className="text-lg font-bold text-white">Zonal Edge</span>
+          </Link>
           <h1 className="text-2xl font-bold text-[var(--text-primary)]">Create an Account</h1>
           <p className="text-xs text-[var(--text-muted)] mt-1.5">
-            Join Zonal Edge to access real-time charts & market analytics
+            Join Zonal Edge to access real-time charts & market structure
           </p>
         </div>
 
@@ -152,6 +166,50 @@ export default function Register() {
         )}
 
         <form onSubmit={handleRegister} className="space-y-3.5">
+          {/* Account Role Selection */}
+          <div>
+            <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
+              Select Account Role
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedRole('user')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  selectedRole === 'user'
+                    ? 'bg-[var(--accent-indigo)]/15 border-[var(--accent-indigo)] text-white shadow-sm'
+                    : 'bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                  <LineChart size={14} className="text-emerald-400" />
+                  <span>Subscriber</span>
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-tight">
+                  View live charts, zones, OI data & market analysis
+                </p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRole('editor')}
+                className={`p-3 rounded-xl border text-left transition-all ${
+                  selectedRole === 'editor'
+                    ? 'bg-blue-500/15 border-blue-500 text-white shadow-sm'
+                    : 'bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-white'
+                }`}
+              >
+                <div className="flex items-center gap-1.5 font-bold text-xs text-white">
+                  <PenSquare size={14} className="text-blue-400" />
+                  <span>Chart Editor</span>
+                </div>
+                <p className="text-[10px] text-[var(--text-muted)] mt-1 leading-tight">
+                  Edit & publish charts/zones, add users (billing restricted)
+                </p>
+              </button>
+            </div>
+          </div>
+
           {/* Full Name */}
           <div>
             <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
@@ -165,7 +223,7 @@ export default function Register() {
                 onChange={(e) => setFullName(e.target.value)}
                 required
                 className="w-full pl-10 pr-3 py-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent-indigo)] transition-colors"
-                placeholder="Barath Kumar"
+                placeholder="Viknesh"
               />
             </div>
           </div>
@@ -183,7 +241,7 @@ export default function Register() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full pl-10 pr-3 py-2 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-sm focus:outline-none focus:border-[var(--accent-indigo)] transition-colors"
-                placeholder="you@example.com"
+                placeholder="trader@example.com"
               />
             </div>
           </div>
@@ -240,7 +298,7 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Mandatory Terms & Privacy Checkbox */}
+          {/* Mandatory Terms, Privacy & Policy Checkbox */}
           <div className="pt-2">
             <div className="flex items-start gap-2.5 p-3 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
               <input
@@ -259,8 +317,8 @@ export default function Register() {
                   className="text-[var(--accent-indigo)] font-medium hover:underline"
                 >
                   Terms of Service
-                </Link>{' '}
-                and{' '}
+                </Link>
+                ,{' '}
                 <Link
                   to="/privacy"
                   target="_blank"
@@ -268,6 +326,24 @@ export default function Register() {
                   className="text-[var(--accent-indigo)] font-medium hover:underline"
                 >
                   Privacy Policy
+                </Link>
+                ,{' '}
+                <Link
+                  to="/refund-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--accent-indigo)] font-medium hover:underline"
+                >
+                  Return & Refund Policy
+                </Link>
+                , and{' '}
+                <Link
+                  to="/cancellation-policy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[var(--accent-indigo)] font-medium hover:underline"
+                >
+                  Cancellation Policy
                 </Link>
                 .
               </label>
@@ -279,7 +355,7 @@ export default function Register() {
                 onClick={() => setShowTermsModal(true)}
                 className="text-[11px] text-[var(--accent-indigo)] hover:underline flex items-center gap-1"
               >
-                <FileText size={12} /> Read Key Disclosures & Terms Summary
+                <FileText size={12} /> Read Key Disclosures & Compliance Summary
               </button>
             </div>
           </div>
@@ -291,110 +367,90 @@ export default function Register() {
             className="w-full py-2.5 rounded-md bg-[var(--accent-indigo)] text-white text-sm font-medium hover:brightness-110 transition-all flex items-center justify-center gap-2 mt-4 disabled:opacity-70 shadow-md"
           >
             {loading ? <Loader2 className="animate-spin" size={16} /> : null}
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? 'Creating account...' : `Register as ${selectedRole === 'editor' ? 'Chart Editor' : 'Subscriber'}`}
           </button>
         </form>
 
         <p className="text-center text-xs text-[var(--text-muted)] mt-6">
           Already have an account?{' '}
           <Link to="/login" className="text-[var(--accent-indigo)] font-medium hover:underline">
-            Sign in
+            Sign In
           </Link>
         </p>
       </motion.div>
 
-      {/* Interactive Quick-Read Modal */}
+      {/* Disclosures & Terms Summary Modal */}
       <AnimatePresence>
         {showTermsModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
             <motion.div
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="w-full max-w-lg max-h-[85vh] flex flex-col rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl overflow-hidden"
+              className="w-full max-w-lg rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
             >
-              {/* Modal Header */}
-              <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border-subtle)]">
-                <div className="flex items-center gap-2 text-sm font-bold text-[var(--text-primary)]">
-                  <ShieldAlert size={18} className="text-amber-400" />
-                  Key Terms & Privacy Disclosures
+              <div className="p-4 border-b border-[var(--border-subtle)] flex items-center justify-between bg-[var(--bg-tertiary)]">
+                <div className="flex items-center gap-2">
+                  <ShieldAlert className="text-amber-400" size={18} />
+                  <h3 className="text-sm font-bold text-[var(--text-primary)]">
+                    Legal & Compliance Disclosures
+                  </h3>
                 </div>
                 <button
                   onClick={() => setShowTermsModal(false)}
-                  className="p-1 rounded-md text-[var(--text-muted)] hover:text-white hover:bg-[var(--bg-tertiary)]"
+                  className="p-1 rounded-md text-[var(--text-muted)] hover:text-white hover:bg-white/10"
                 >
-                  <X size={16} />
+                  <X size={18} />
                 </button>
               </div>
 
-              {/* Modal Scrollable Body */}
-              <div className="p-5 overflow-y-auto space-y-4 text-xs text-[var(--text-secondary)] leading-relaxed">
-                <div className="p-3.5 rounded-lg border border-amber-500/20 bg-amber-500/5 space-y-1.5">
-                  <p className="font-bold text-amber-300 flex items-center gap-1.5">
-                    <ShieldAlert size={14} /> Statutory Regulatory Disclaimer (SEBI)
-                  </p>
-                  <p className="text-amber-200/90 text-[11px]">
-                    Zonal Edge is solely an educational and analytical charting tool. We are NOT
-                    SEBI-registered Investment Advisers or Research Analysts. We do not provide buy/sell signals,
-                    portfolio management, or guaranteed returns.
+              <div className="p-6 overflow-y-auto space-y-4 text-xs leading-relaxed text-[var(--text-secondary)]">
+                <div className="p-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 space-y-1">
+                  <p className="font-bold text-white">Operated by Vedgetechnologies</p>
+                  <p className="text-[11px] text-indigo-200">
+                    Trade Name: Vedgetechnologies &middot; Legal Name: Viknesh &middot; Registered Address: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India.
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <p className="font-semibold text-[var(--text-primary)]">1. Market Risk Acknowledgment</p>
+                <div className="space-y-1">
+                  <p className="font-bold text-[var(--text-primary)]">1. Educational Nature of Services</p>
                   <p>
-                    Per SEBI statistics, 9 out of 10 individual traders incur net losses in the Futures and Options (F&O)
-                    market. Capital is at risk. Past setups are strictly for historical study.
+                    Zonal Edge is an educational market analysis portal providing market structure models, zones, liquidation levels, and OI analytics for Indian equities and indices (Nifty, Sensex). It does NOT provide SEBI-registered advisory services or guaranteed trading returns.
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <p className="font-semibold text-[var(--text-primary)]">2. Digital Subscriptions & Payments</p>
+                <div className="space-y-1">
+                  <p className="font-bold text-[var(--text-primary)]">2. Refund Policy</p>
+                  <p className="p-2.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] italic">
+                    “All purchases and subscription payments made on Zonal Edge are final and non-refundable. Once a purchase is completed, no refunds will be issued. Users are advised to review the subscription plan and service details carefully before making a payment.”
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-bold text-[var(--text-primary)]">3. Cancellation Policy</p>
+                  <p className="p-2.5 rounded bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] italic">
+                    “Users can cancel their subscription at any time during the free trial period. Once the free trial ends and a paid subscription begins, the subscription payment is non-refundable. Users should review the applicable subscription terms before proceeding with payment.”
+                  </p>
+                </div>
+
+                <div className="space-y-1">
+                  <p className="font-bold text-[var(--text-primary)]">4. Market Risk Acknowledgment</p>
                   <p>
-                    All subscription fees processed through Razorpay are non-refundable once digital analytics access
-                    is provisioned. Subscriptions renew automatically unless cancelled before the renewal date.
+                    Trading futures, options, and cash equities in the Indian markets carries substantial capital risk. You bear 100% individual responsibility for all trade executions.
                   </p>
-                </div>
-
-                <div className="space-y-1.5">
-                  <p className="font-semibold text-[var(--text-primary)]">3. Data Privacy & Zero Spam</p>
-                  <p>
-                    We never sell or rent your personal information. Payment credentials are handled directly by
-                    PCI-compliant Razorpay; we never store CVVs or UPI PINs.
-                  </p>
-                </div>
-
-                <div className="pt-2 text-[11px] text-[var(--text-muted)] border-t border-[var(--border-subtle)]">
-                  For the full legal documents, visit the dedicated{' '}
-                  <Link to="/terms" target="_blank" className="text-[var(--accent-indigo)] underline">
-                    Terms of Service
-                  </Link>{' '}
-                  and{' '}
-                  <Link to="/privacy" target="_blank" className="text-[var(--accent-indigo)] underline">
-                    Privacy Policy
-                  </Link>{' '}
-                  pages.
                 </div>
               </div>
 
-              {/* Modal Footer */}
-              <div className="flex items-center justify-between px-5 py-3.5 border-t border-[var(--border-subtle)] bg-[var(--bg-tertiary)]">
-                <button
-                  type="button"
-                  onClick={() => setShowTermsModal(false)}
-                  className="px-4 py-2 rounded-md text-xs text-[var(--text-muted)] hover:text-white"
-                >
-                  Close
-                </button>
+              <div className="p-4 border-t border-[var(--border-subtle)] bg-[var(--bg-tertiary)] flex justify-end">
                 <button
                   type="button"
                   onClick={() => {
                     setAgreedTerms(true)
                     setShowTermsModal(false)
                   }}
-                  className="px-4 py-2 rounded-md bg-[var(--accent-indigo)] text-white text-xs font-medium hover:brightness-110 flex items-center gap-1.5"
+                  className="px-4 py-2 rounded-md bg-[var(--accent-indigo)] text-white text-xs font-semibold hover:brightness-110"
                 >
-                  <CheckCircle2 size={14} /> Accept & Check Box
+                  I Understand & Accept
                 </button>
               </div>
             </motion.div>

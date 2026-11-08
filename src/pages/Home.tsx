@@ -33,7 +33,7 @@ const itemVariants = {
 
 export default function Home() {
   const { market } = useMarket()
-  const { profile, isSuperAdmin, isAdmin } = useAuth()
+  const { profile, isSuperAdmin, isAdmin, hasEditorAccess, hasAdminAccess } = useAuth()
 
   // Everything below comes from what the admin published (database + realtime push)
   const { data: liveData, alert, justUpdated, ready } = useLiveMarket(market)
@@ -103,23 +103,21 @@ export default function Home() {
         </div>
 
         <div className="flex items-center gap-2">
-          {(isSuperAdmin || isAdmin) && (
+          {hasEditorAccess && (
             <Link
               to="/dashboard"
-              className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 text-xs font-bold border border-amber-500/30 hover:bg-amber-500/25 transition-colors flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg bg-amber-500/15 text-amber-300 text-xs font-bold border border-amber-500/30 hover:bg-amber-500/25 transition-colors flex items-center gap-1.5 shadow-sm"
             >
               <ShieldCheck size={13} className="text-amber-400" />
-              <span>Back to Admin Console</span>
+              <span>{hasAdminAccess ? 'Admin Console' : 'Editor Dashboard'}</span>
             </Link>
           )}
-          {!isPro && (
-            <Link
-              to="/app/subscription"
-              className="px-4 py-1.5 rounded bg-indigo-500/10 text-indigo-400 text-xs font-semibold hover:bg-indigo-500/20 transition-colors flex items-center gap-1.5"
-            >
-              <Lock size={12} /> Unlock Pro Features
-            </Link>
-          )}
+          <Link
+            to="/app/subscription"
+            className="px-3 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-300 text-xs font-semibold hover:bg-indigo-500/20 transition-colors flex items-center gap-1.5 border border-indigo-500/20"
+          >
+            <span>My Plan & Validity</span>
+          </Link>
         </div>
       </motion.div>
 

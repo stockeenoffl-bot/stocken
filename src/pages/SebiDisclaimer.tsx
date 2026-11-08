@@ -1,4 +1,4 @@
-﻿import { useState } from 'react'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
@@ -260,16 +260,19 @@ export default function SebiDisclaimer() {
 
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>Â© 2025 Zonal Edge. All rights reserved.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-left">
+            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            <Link to="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors text-[var(--accent-indigo)]">SEBI Disclaimer</Link>
             <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
+            <Link to="/cancellation-policy" className="hover:text-white transition-colors">Cancellation Policy</Link>
+            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors text-white font-semibold">SEBI Disclaimer</Link>
             <Link to="/about" className="hover:text-white transition-colors">About Us</Link>
-            <Link to="/contact" className="hover:text-white transition-colors">Contact Us</Link>
-            <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
           </div>
         </div>
       </footer>

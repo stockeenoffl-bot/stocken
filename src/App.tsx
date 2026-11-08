@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom'
 import { MarketProvider } from '@/contexts/MarketContext'
 import { AnalysisProvider } from '@/contexts/AnalysisContext'
 import { AuthProvider } from '@/contexts/AuthContext'
-import { AdminRoute, ClientRoute, PublicRoute } from '@/components/layout/RouteGuards'
+import { AdminRoute, AdminOnlyRoute, ClientRoute, PublicRoute } from '@/components/layout/RouteGuards'
 
 import DashboardLayout from '@/components/layout/DashboardLayout'
 import Landing from '@/pages/Landing'
@@ -13,6 +13,7 @@ import Terms from '@/pages/Terms'
 import Privacy from '@/pages/Privacy'
 import SebiDisclaimer from '@/pages/SebiDisclaimer'
 import RefundPolicy from '@/pages/RefundPolicy'
+import CancellationPolicy from '@/pages/CancellationPolicy'
 import AboutUs from '@/pages/AboutUs'
 import ContactUs from '@/pages/ContactUs'
 import LiveChartPage from '@/pages/LiveChartPage'
@@ -41,6 +42,7 @@ export default function App() {
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/sebi-disclaimer" element={<SebiDisclaimer />} />
             <Route path="/refund-policy" element={<RefundPolicy />} />
+            <Route path="/cancellation-policy" element={<CancellationPolicy />} />
             <Route path="/about" element={<AboutUs />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -51,25 +53,29 @@ export default function App() {
               <Route path="/register" element={<Register />} />
             </Route>
 
-            {/* Admin Routes */}
+            {/* Admin & Editor Shared Routes (Charts, Zones, Analysis, User Management) */}
             <Route element={<AdminRoute />}>
               <Route element={<DashboardLayout />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/indian-markets" element={<IndianMarkets />} />
                 <Route path="/chart" element={<LiveChartPage />} />
-                <Route path="/users" element={<Users />} />
-                <Route path="/subscriptions" element={<Subscriptions />} />
-                <Route path="/notifications" element={<Notifications />} />
-                <Route path="/learning" element={<Learning />} />
-                <Route path="/security" element={<Security />} />
-                <Route path="/broker" element={<Broker />} />
                 <Route path="/create" element={<Create />} />
                 <Route path="/preview" element={<Preview />} />
                 <Route path="/oi" element={<OI />} />
+                <Route path="/users" element={<Users />} />
+                <Route path="/learning" element={<Learning />} />
+
+                {/* Strictly Admin-Only Routes (Editors cannot view subscriptions/payments or system credentials) */}
+                <Route element={<AdminOnlyRoute />}>
+                  <Route path="/subscriptions" element={<Subscriptions />} />
+                  <Route path="/notifications" element={<Notifications />} />
+                  <Route path="/security" element={<Security />} />
+                  <Route path="/broker" element={<Broker />} />
+                </Route>
               </Route>
             </Route>
 
-            {/* Client Routes */}
+            {/* Client Subscriber Routes (Charts, OI Data, Indian Markets, Learning, My Subscription) */}
             <Route element={<ClientRoute />}>
               <Route path="/app" element={<DashboardLayout isClient={true} />}>
                 <Route index element={<Home />} />
@@ -77,7 +83,6 @@ export default function App() {
                 <Route path="chart" element={<LiveChartPage />} />
                 <Route path="oi" element={<OI />} />
                 <Route path="learning" element={<Learning />} />
-                <Route path="notifications" element={<Notifications />} />
                 <Route path="subscription" element={<Subscriptions isClient={true} />} />
               </Route>
             </Route>

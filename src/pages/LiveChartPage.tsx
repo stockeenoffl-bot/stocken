@@ -11,7 +11,7 @@ const WATCHLIST = ['NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'INDIA VIX', '
 
 export default function LiveChartPage() {
   const { market } = useMarket()
-  const { hasAdminAccess } = useAuth()
+  const { hasEditorAccess } = useAuth()
   const [symbol, setSymbol] = useState<string | null>(null)
   const active = symbol || market
   const { data } = useLiveMarket(active)
@@ -30,8 +30,8 @@ export default function LiveChartPage() {
             Real-time NSE/BSE candles from Alice Blue — every timeframe (1m to Monthly) and range (1D to 5Y). Zones and notes below are published live.
           </p>
         </div>
-        {hasAdminAccess ? (
-          <Link to="/create" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110">
+        {hasEditorAccess ? (
+          <Link to="/create" className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 shadow-sm self-start sm:self-auto">
             <PenSquare size={13} /> Edit & publish analysis
           </Link>
         ) : (

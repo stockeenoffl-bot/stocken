@@ -8,7 +8,7 @@ export interface Profile {
   full_name: string | null
   display_name: string | null
   avatar_url: string | null
-  role: 'super_admin' | 'admin' | 'analyst' | 'user'
+  role: 'super_admin' | 'admin' | 'analyst' | 'editor' | 'user'
   status: 'active' | 'inactive' | 'suspended' | 'banned' | 'pending'
 }
 
@@ -19,12 +19,13 @@ interface AuthContextType {
   loading: boolean
   isAdmin: boolean
   isSuperAdmin: boolean
+  isEditor: boolean
   isUser: boolean
   hasAdminAccess: boolean
+  hasEditorAccess: boolean
+  canViewSubscriptions: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
-  elevateToAdmin: () => void
-  elevateToSuperAdmin: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -34,12 +35,13 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   isAdmin: false,
   isSuperAdmin: false,
+  isEditor: false,
   isUser: true,
   hasAdminAccess: false,
+  hasEditorAccess: false,
+  canViewSubscriptions: false,
   signOut: async () => {},
   refreshProfile: async () => {},
-  elevateToAdmin: () => {},
-  elevateToSuperAdmin: async () => {},
 })
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -68,10 +70,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single()
 
       if (error || !data) {
-        // Self-healing: Create profile with admin if known admin email, otherwise user
-        const assignedRole = isKnownAdminEmail ? 'admin' : 'user'
-        const userDisplayName = isKnownAdminEmail ? 'Admin' : 'User'
-        const userFullName = authData?.user?.user_metadata?.full_name || authData?.user?.email?.split('@')[0] || (isKnownAdminEmail ? 'Admin' : 'User')
+        // Self-healing: Read requested role from user metadata
+        const metadataRole = authData?.user?.user_metadata?.role as Profile['role'] | undefined
+        const validRoles: Profile['role'][] = ['editor', 'analyst', 'user', 'admin', 'super_admin']
+        let assignedRole: Profile['role'] = 'user'
+
+        if (isKnownAdminEmail) {
+          assignedRole = 'admin'
+        } else if (metadataRole && validRoles.includes(metadataRole)) {
+          // Never allow direct self-assignment to admin/super_admin from metadata
+          assignedRole = (metadataRole === 'editor' || metadataRole === 'analyst') ? 'editor' : 'user'
+        }
+
+        const userDisplayName = isKnownAdminEmail ? 'Admin' : (assignedRole === 'editor' ? 'Editor' : 'User')
+        const userFullName = authData?.user?.user_metadata?.full_name || authData?.user?.email?.split('@')[0] || userDisplayName
 
         if (authData?.user) {
           const { data: newProfile } = await supabase
@@ -91,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .single()
 
           if (newProfile) {
-            setProfile(newProfile)
+            setProfile(newProfile as Profile)
           } else {
             // In-memory fallback
             setProfile({
@@ -107,11 +119,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       } else {
         // If it is a known admin email and not yet admin in db, auto-upgrade in DB & memory
-        if (isKnownAdminEmail && data.role !== 'admin') {
+        if (isKnownAdminEmail && data.role !== 'admin' && data.role !== 'super_admin') {
           supabase.from('profiles').update({ role: 'admin' }).eq('id', userId).then(() => {})
-          setProfile({ ...data, role: 'admin' })
+          setProfile({ ...data, role: 'admin' } as Profile)
         } else {
-          setProfile(data)
+          setProfile(data as Profile)
         }
       }
     } catch (err) {
@@ -149,25 +161,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const isSuperAdmin = Boolean(profile?.role === 'super_admin')
-  const isAdmin = Boolean(profile && ['admin', 'super_admin', 'analyst'].includes(profile.role))
+  const isAdmin = Boolean(profile && ['admin', 'super_admin'].includes(profile.role))
+  const isEditor = Boolean(profile && ['editor', 'analyst'].includes(profile.role))
   const isUser = Boolean(!profile || profile.role === 'user')
-  const hasAdminAccess = isAdmin
 
-  const elevateToSuperAdmin = async () => {
-    await elevateToAdmin()
-  }
-
-  const elevateToAdmin = async () => {
-    if (user && profile) {
-      const updated: Profile = { ...profile, role: 'admin' }
-      setProfile(updated)
-      try {
-        await supabase.from('profiles').update({ role: 'admin' }).eq('id', user.id)
-      } catch (err) {
-        console.warn('Could not persist admin role to DB:', err)
-      }
-    }
-  }
+  const hasAdminAccess = isAdmin || isSuperAdmin
+  const hasEditorAccess = hasAdminAccess || isEditor
+  const canViewSubscriptions = hasAdminAccess // Only admin can view customer subscriptions and payments
 
   const refreshProfile = async () => {
     if (user) {
@@ -191,12 +191,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         isAdmin,
         isSuperAdmin,
+        isEditor,
         isUser,
         hasAdminAccess,
+        hasEditorAccess,
+        canViewSubscriptions,
         signOut,
         refreshProfile,
-        elevateToAdmin,
-        elevateToSuperAdmin,
       }}
     >
       {children}

@@ -4,8 +4,6 @@ import {
   Search,
   ToggleLeft,
   ToggleRight,
-  Smartphone,
-  Globe,
   UserPlus,
   Shield,
   CheckCircle2,
@@ -15,10 +13,12 @@ import {
   Loader2,
   Users as UsersIcon,
   Crown,
+  Lock,
 } from 'lucide-react'
 import { userService } from '@/services/userService'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface RealUser {
   id: string
@@ -41,6 +41,7 @@ const itemVariants = {
 }
 
 export default function Users() {
+  const { hasAdminAccess, isEditor, canViewSubscriptions } = useAuth()
   const [activeSubTab, setActiveSubTab] = useState('search-users')
   const [userQuery, setUserQuery] = useState('')
   const [roleFilter, setRoleFilter] = useState('all')
@@ -80,7 +81,7 @@ export default function Users() {
             month: 'short',
             year: 'numeric',
           }),
-          plan: activeSub?.subscription_plans?.name || 'Free',
+          plan: activeSub?.subscription_plans?.name || 'Free Trial',
         }
       })
       setUsers(formatted)
@@ -103,6 +104,10 @@ export default function Users() {
   }
 
   const changeUserPlan = async (id: string, newPlan: string) => {
+    if (!canViewSubscriptions) {
+      toast.error('Only Administrators can change subscription plans.')
+      return
+    }
     try {
       await userService.updateUserPlan(id, newPlan)
       toast.success(`User plan updated to ${newPlan}`)
@@ -113,6 +118,12 @@ export default function Users() {
   }
 
   const changeUserRole = async (id: string, newRole: string) => {
+    // Prevent editors from assigning admin role
+    if (!hasAdminAccess && (newRole === 'admin' || newRole === 'super_admin')) {
+      toast.error('Only Super Admins can promote users to Administrator.')
+      return
+    }
+
     try {
       const { error } = await supabase.from('profiles').update({ role: newRole }).eq('id', id)
       if (error) throw error
@@ -140,28 +151,21 @@ export default function Users() {
         role: newUser.role,
         status: 'active',
         created_at: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-        plan: newUser.plan,
+        plan: canViewSubscriptions ? newUser.plan : 'Free Trial',
       }
 
       setUsers((prev) => [createdUserObj, ...prev])
-      toast.success(`Member ${newUser.fullName} registered successfully!`)
+      toast.success(`Member ${newUser.fullName} registered as ${newUser.role}!`)
       setShowAddModal(false)
-      setNewUser({ fullName: '', email: '', role: 'user', plan: 'Pro' })
+      setNewUser({ fullName: '', email: '', role: 'user', plan: 'Free Trial' })
     } catch (err: any) {
-      toast.error('Error creating user: ' + err.message)
+      toast.error('Failed to create user: ' + err.message)
     } finally {
       setCreatingUser(false)
     }
   }
 
-  const subTabs = [
-    { id: 'search-users', label: 'User Directory & Roster' },
-    { id: 'activate-deactivate', label: 'Access & Suspensions' },
-    { id: 'membership-status', label: 'Tier & Subscription Upgrades' },
-    { id: 'login-history', label: 'Login History & Audits' },
-    { id: 'device-info', label: 'Device & Session Info' },
-  ]
-
+  // Filtered Users
   const filteredUsers = users.filter((u) => {
     const matchesQuery =
       u.full_name.toLowerCase().includes(userQuery.toLowerCase()) ||
@@ -171,32 +175,45 @@ export default function Users() {
     return matchesQuery && matchesRole && matchesStatus
   })
 
-  // Quick Stats
   const activeCount = users.filter((u) => u.status === 'active').length
   const suspendedCount = users.filter((u) => u.status !== 'active').length
-  const proCount = users.filter((u) => u.plan !== 'Free').length
+  const editorCount = users.filter((u) => u.role === 'editor' || u.role === 'analyst').length
+  const proCount = users.filter((u) => u.plan !== 'Free' && u.plan !== 'Free Trial').length
+
+  const subTabs = [
+    { id: 'search-users', label: 'User Directory' },
+    { id: 'activate-deactivate', label: 'Access Control' },
+    ...(canViewSubscriptions ? [{ id: 'membership-status', label: 'Plan Assignment' }] : []),
+  ]
 
   return (
     <motion.div variants={containerVariants} initial="hidden" animate="show" className="space-y-6">
-      {/* Header & Add User Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      {/* Top Header & Add User Action */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-[var(--text-primary)]">User Management</h1>
-          <p className="text-xs mt-1 text-[var(--text-muted)]">
-            Manage subscriber credentials, platform access roles, plan tiers, and security statuses.
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl font-bold text-[var(--text-primary)]">User & Role Management</h1>
+            {isEditor && !hasAdminAccess && (
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/10 text-blue-400 border border-blue-500/30">
+                EDITOR VIEW
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-[var(--text-muted)] mt-1">
+            Manage subscriber credentials, platform access roles, and platform authorizations.
           </p>
         </div>
 
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 shadow-sm transition-all w-fit"
+          className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 transition-all shadow-md shrink-0"
         >
-          <UserPlus size={14} />
+          <UserPlus size={15} />
           <span>Add New Member</span>
         </button>
       </div>
 
-      {/* Summary Stat Counters */}
+      {/* Quick Metrics Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="p-3.5 rounded-xl border bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
           <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Total Users</span>
@@ -207,8 +224,12 @@ export default function Users() {
           <h4 className="text-xl font-mono font-bold text-emerald-400 mt-0.5">{activeCount}</h4>
         </div>
         <div className="p-3.5 rounded-xl border bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
-          <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Premium / Pro</span>
-          <h4 className="text-xl font-mono font-bold text-[var(--accent-indigo)] mt-0.5">{proCount}</h4>
+          <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">
+            {canViewSubscriptions ? 'Paid Subscribers' : 'Chart Editors'}
+          </span>
+          <h4 className="text-xl font-mono font-bold text-[var(--accent-indigo)] mt-0.5">
+            {canViewSubscriptions ? proCount : editorCount}
+          </h4>
         </div>
         <div className="p-3.5 rounded-xl border bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
           <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Suspended</span>
@@ -247,16 +268,16 @@ export default function Users() {
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.2 }}
-          className="rounded-xl border p-6 bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-6"
+          className="rounded-xl border p-4 sm:p-6 bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-6"
         >
           {/* TAB 1: SEARCH & DIRECTORY */}
           {activeSubTab === 'search-users' && (
             <div className="space-y-4">
               <div className="pb-3 border-b border-[var(--border-subtle)] flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">User Directory & Roster</h3>
+                  <h3 className="text-sm font-semibold text-[var(--text-primary)]">User Directory</h3>
                   <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                    Filter and inspect all registered accounts, change roles, and assign tiers.
+                    Filter and inspect registered accounts, assign roles, and manage access.
                   </p>
                 </div>
                 <span className="text-[10px] text-[var(--text-muted)] font-mono">
@@ -285,7 +306,8 @@ export default function Users() {
                   >
                     <option value="all">All Roles</option>
                     <option value="admin">Admin</option>
-                    <option value="user">User</option>
+                    <option value="editor">Editor</option>
+                    <option value="user">Subscriber (User)</option>
                   </select>
                 </div>
 
@@ -304,12 +326,12 @@ export default function Users() {
 
               {/* Table */}
               <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
-                <table className="w-full text-left text-xs bg-[var(--bg-tertiary)]">
+                <table className="w-full text-left text-xs bg-[var(--bg-tertiary)] min-w-[600px]">
                   <thead>
                     <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)]">
                       <th className="p-3">User</th>
                       <th className="p-3">Role</th>
-                      <th className="p-3">Plan</th>
+                      {canViewSubscriptions && <th className="p-3">Plan</th>}
                       <th className="p-3">Status</th>
                       <th className="p-3">Joined</th>
                       <th className="p-3 text-right">Quick Action</th>
@@ -318,7 +340,7 @@ export default function Users() {
                   <tbody>
                     {loading ? (
                       <tr>
-                        <td colSpan={6} className="p-8 text-center">
+                        <td colSpan={canViewSubscriptions ? 6 : 5} className="p-8 text-center">
                           <Loader2 className="animate-spin text-[var(--accent-indigo)] mx-auto" />
                         </td>
                       </tr>
@@ -339,24 +361,30 @@ export default function Users() {
                               className={`px-2 py-0.5 rounded text-[10px] font-bold border outline-none bg-[var(--bg-secondary)] ${
                                 user.role === 'admin'
                                   ? 'text-indigo-400 border-indigo-500/30'
+                                  : user.role === 'editor'
+                                  ? 'text-blue-400 border-blue-500/30'
                                   : 'text-slate-400 border-slate-500/30'
                               }`}
                             >
-                              <option value="admin">Admin</option>
-                              <option value="user">User</option>
+                              <option value="user">Subscriber</option>
+                              <option value="editor">Editor</option>
+                              {hasAdminAccess && <option value="admin">Admin</option>}
                             </select>
                           </td>
-                          <td className="p-3">
-                            <select
-                              value={user.plan}
-                              onChange={(e) => changeUserPlan(user.id, e.target.value)}
-                              className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
-                            >
-                              <option value="Free">Free</option>
-                              <option value="Pro">Pro</option>
-                              <option value="VIP">VIP</option>
-                            </select>
-                          </td>
+                          {canViewSubscriptions && (
+                            <td className="p-3">
+                              <select
+                                value={user.plan}
+                                onChange={(e) => changeUserPlan(user.id, e.target.value)}
+                                className="px-2 py-0.5 rounded text-[10px] font-bold bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)]"
+                              >
+                                <option value="Free Trial">Free Trial</option>
+                                <option value="Monthly">Monthly (₹499)</option>
+                                <option value="Quarterly">Quarterly (₹1,299)</option>
+                                <option value="Annual">Annual (₹4,999)</option>
+                              </select>
+                            </td>
+                          )}
                           <td className="p-3">
                             <span
                               className={`px-2 py-0.5 rounded text-[9px] font-bold uppercase ${
@@ -381,7 +409,7 @@ export default function Users() {
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={6} className="p-6 text-center text-[var(--text-muted)]">
+                        <td colSpan={canViewSubscriptions ? 6 : 5} className="p-6 text-center text-[var(--text-muted)]">
                           No users found matching query.
                         </td>
                       </tr>
@@ -435,13 +463,13 @@ export default function Users() {
             </div>
           )}
 
-          {/* TAB 3: MEMBERSHIP & PLAN TIERS */}
-          {activeSubTab === 'membership-status' && (
+          {/* TAB 3: MEMBERSHIP & PLAN TIERS (Only for Super Admin) */}
+          {canViewSubscriptions && activeSubTab === 'membership-status' && (
             <div className="space-y-4">
               <div className="pb-3 border-b border-[var(--border-subtle)]">
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">Subscription Plan Assignment</h3>
                 <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                  Directly grant Pro or VIP status to subscribers without payment delays.
+                  Directly grant Free Trial, Monthly, Quarterly, or Annual plans to subscribers.
                 </p>
               </div>
 
@@ -449,7 +477,7 @@ export default function Users() {
                 {users.map((user) => (
                   <div
                     key={user.id}
-                    className="flex items-center justify-between p-3.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] gap-2"
                   >
                     <div>
                       <span className="text-xs font-bold text-[var(--text-primary)]">{user.full_name}</span>
@@ -457,117 +485,18 @@ export default function Users() {
                         {user.email} &bull; Current: <span className="text-indigo-400 font-bold">{user.plan}</span>
                       </span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={user.plan}
-                        onChange={(e) => changeUserPlan(user.id, e.target.value)}
-                        className="px-3 py-1.5 text-xs rounded-lg border outline-none bg-[var(--bg-secondary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
-                      >
-                        <option value="Free">Free Basic Tier</option>
-                        <option value="Pro">Pro Plan (₹1,499/mo)</option>
-                        <option value="VIP">VIP All-Access (₹4,999/mo)</option>
-                      </select>
-                    </div>
+                    <select
+                      value={user.plan}
+                      onChange={(e) => changeUserPlan(user.id, e.target.value)}
+                      className="px-2.5 py-1 rounded text-xs font-semibold bg-[var(--bg-secondary)] border border-[var(--border-subtle)] text-[var(--text-primary)] outline-none"
+                    >
+                      <option value="Free Trial">Free Trial (7 Days - ₹0)</option>
+                      <option value="Monthly">Monthly Plan (₹499)</option>
+                      <option value="Quarterly">Quarterly Plan (₹1,299)</option>
+                      <option value="Annual">Annual Plan (₹4,999)</option>
+                    </select>
                   </div>
                 ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 4: LOGIN HISTORY */}
-          {activeSubTab === 'login-history' && (
-            <div className="space-y-4">
-              <div className="pb-3 border-b border-[var(--border-subtle)]">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Recent Access Attempts & Logins</h3>
-                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                  Audit logs of subscriber authentication timestamps and IP addresses.
-                </p>
-              </div>
-
-              <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
-                <table className="w-full text-left text-xs bg-[var(--bg-tertiary)]">
-                  <thead>
-                    <tr className="border-b border-[var(--border-subtle)] bg-[var(--bg-secondary)] text-[var(--text-muted)]">
-                      <th className="p-3">User</th>
-                      <th className="p-3">IP Address</th>
-                      <th className="p-3">Device / Client</th>
-                      <th className="p-3">Timestamp</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    <tr className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                      <td className="p-3 font-semibold text-[var(--text-primary)]">Admin (Stocken)</td>
-                      <td className="p-3 font-mono">103.21.244.10</td>
-                      <td className="p-3 flex items-center gap-1.5">
-                        <Globe size={13} /> Windows / Chrome (Static IP)
-                      </td>
-                      <td className="p-3 font-mono">Today, 02:45 PM</td>
-                    </tr>
-                    <tr className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                      <td className="p-3 font-semibold text-[var(--text-primary)]">Alexander Wright</td>
-                      <td className="p-3 font-mono">192.168.1.12</td>
-                      <td className="p-3 flex items-center gap-1.5">
-                        <Smartphone size={13} /> iPhone / Safari
-                      </td>
-                      <td className="p-3 font-mono">Today, 11:14 AM</td>
-                    </tr>
-                    <tr className="border-b border-[var(--border-subtle)] text-[var(--text-secondary)]">
-                      <td className="p-3 font-semibold text-[var(--text-primary)]">Sarah Jenkins</td>
-                      <td className="p-3 font-mono">203.0.113.88</td>
-                      <td className="p-3 flex items-center gap-1.5">
-                        <Globe size={13} /> MacOS / Chrome
-                      </td>
-                      <td className="p-3 font-mono">Yesterday, 10:48 AM</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 5: DEVICE INFO */}
-          {activeSubTab === 'device-info' && (
-            <div className="space-y-4">
-              <div className="pb-3 border-b border-[var(--border-subtle)]">
-                <h3 className="text-sm font-semibold text-[var(--text-primary)]">Device & Session Breakdown</h3>
-                <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                  Aggregate client device statistics across active trader sessions.
-                </p>
-              </div>
-
-              <div className="p-5 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-4">
-                <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">
-                  Active Member Client Devices
-                </span>
-                <div className="space-y-3">
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-[var(--text-secondary)]">
-                      <span>Desktop Web Trading (Chrome / Firefox / Edge)</span>
-                      <span className="font-bold">65%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
-                      <div className="h-full bg-[var(--accent-indigo)]" style={{ width: '65%' }} />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-[var(--text-secondary)]">
-                      <span>Mobile Web & App (iOS / Android)</span>
-                      <span className="font-bold">30%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
-                      <div className="h-full bg-purple-500" style={{ width: '30%' }} />
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex justify-between text-xs text-[var(--text-secondary)]">
-                      <span>Tablets & iPads</span>
-                      <span className="font-bold">5%</span>
-                    </div>
-                    <div className="h-2 rounded-full bg-[var(--bg-secondary)] overflow-hidden">
-                      <div className="h-full bg-amber-400" style={{ width: '5%' }} />
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
           )}
@@ -576,27 +505,24 @@ export default function Users() {
 
       {/* Add User Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="w-full max-w-md p-6 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] shadow-2xl space-y-4"
+            className="w-full max-w-md rounded-xl border p-6 bg-[var(--bg-secondary)] border-[var(--border-subtle)] shadow-2xl"
           >
             <div className="flex items-center justify-between pb-3 border-b border-[var(--border-subtle)]">
-              <h3 className="text-sm font-bold text-[var(--text-primary)] flex items-center gap-2">
-                <UserPlus size={16} className="text-[var(--accent-indigo)]" />
-                Register New Member
-              </h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="text-[var(--text-muted)] hover:text-white"
-              >
+              <div className="flex items-center gap-2">
+                <UserPlus size={18} className="text-[var(--accent-indigo)]" />
+                <h3 className="text-sm font-bold text-[var(--text-primary)]">Add New Platform Member</h3>
+              </div>
+              <button onClick={() => setShowAddModal(false)} className="text-[var(--text-muted)] hover:text-white">
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateUser} className="space-y-3">
+            <form onSubmit={handleCreateUser} className="space-y-4 pt-4">
               <div className="space-y-1">
                 <label className="text-xs font-semibold text-[var(--text-primary)]">Full Name</label>
                 <input
@@ -621,7 +547,7 @@ export default function Users() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className={`grid ${canViewSubscriptions ? 'grid-cols-2' : 'grid-cols-1'} gap-3`}>
                 <div className="space-y-1">
                   <label className="text-xs font-semibold text-[var(--text-primary)]">Access Role</label>
                   <select
@@ -629,23 +555,27 @@ export default function Users() {
                     onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                     className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
                   >
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
+                    <option value="user">Subscriber (User)</option>
+                    <option value="editor">Chart Editor</option>
+                    {hasAdminAccess && <option value="admin">Administrator</option>}
                   </select>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-xs font-semibold text-[var(--text-primary)]">Plan Tier</label>
-                  <select
-                    value={newUser.plan}
-                    onChange={(e) => setNewUser({ ...newUser, plan: e.target.value })}
-                    className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
-                  >
-                    <option value="Free">Free</option>
-                    <option value="Pro">Pro Tier</option>
-                    <option value="VIP">VIP Tier</option>
-                  </select>
-                </div>
+                {canViewSubscriptions && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-[var(--text-primary)]">Plan Tier</label>
+                    <select
+                      value={newUser.plan}
+                      onChange={(e) => setNewUser({ ...newUser, plan: e.target.value })}
+                      className="w-full px-3 py-2 rounded-lg border text-xs outline-none bg-[var(--bg-tertiary)] border-[var(--border-subtle)] text-[var(--text-primary)] focus:border-[var(--accent-indigo)]"
+                    >
+                      <option value="Free Trial">Free Trial (7 Days)</option>
+                      <option value="Monthly">Monthly (₹499)</option>
+                      <option value="Quarterly">Quarterly (₹1,299)</option>
+                      <option value="Annual">Annual (₹4,999)</option>
+                    </select>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-end gap-2 pt-3">
@@ -659,9 +589,10 @@ export default function Users() {
                 <button
                   type="submit"
                   disabled={creatingUser}
-                  className="px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110"
+                  className="px-4 py-2 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 flex items-center gap-1.5"
                 >
-                  {creatingUser ? 'Creating...' : 'Create Member'}
+                  {creatingUser ? <Loader2 size={13} className="animate-spin" /> : null}
+                  <span>{creatingUser ? 'Creating...' : 'Create Member'}</span>
                 </button>
               </div>
             </form>

@@ -28,6 +28,7 @@ import LiveChart from '@/components/charts/LiveChart'
 import QuotesBoard from '@/components/charts/QuotesBoard'
 import StatCard from '@/components/StatCard'
 import { useMarket } from '@/contexts/MarketContext'
+import { useAuth } from '@/contexts/AuthContext'
 import { userService } from '@/services/userService'
 import { aliceBlueService } from '@/services/aliceBlueService'
 import { broadcastSyncService, type LiveMarketData, type FlashAlert } from '@/services/broadcastSyncService'
@@ -45,6 +46,7 @@ const itemVariants = {
 
 export default function Dashboard() {
   const { market } = useMarket()
+  const { hasAdminAccess, isEditor, canViewSubscriptions } = useAuth()
   const navigate = useNavigate()
   const [activeSubTab, setActiveSubTab] = useState('analysis')
   const [stats, setStats] = useState({ totalUsers: 0, proUsers: 0 })
@@ -184,10 +186,10 @@ export default function Dashboard() {
     { id: 'indian-markets', label: '🇮🇳 Indian Market Hub' },
     { id: 'total-users', label: 'Total Users' },
     { id: 'active-users', label: 'Active Users Today' },
-    { id: 'premium-members', label: 'Premium Members' },
+    ...(canViewSubscriptions ? [{ id: 'premium-members', label: 'Premium Members' }] : []),
     { id: 'free-members', label: 'Free Members' },
     { id: 'new-registrations', label: 'New Registrations' },
-    { id: 'monthly-revenue', label: 'Monthly Revenue' },
+    ...(canViewSubscriptions ? [{ id: 'monthly-revenue', label: 'Monthly Revenue' }] : []),
     { id: 'website-visitors', label: 'Website Visitors' }
   ]
 
@@ -213,7 +215,9 @@ export default function Dashboard() {
             </div>
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-[var(--text-primary)]">Alice Blue ANT A3 Broker</span>
+                <span className="text-xs font-bold text-[var(--text-primary)]">
+                  {hasAdminAccess ? 'Alice Blue ANT A3 Broker' : 'Market Analysis Console'}
+                </span>
                 <span
                   className={`w-2 h-2 rounded-full ${
                     brokerConnected ? 'bg-emerald-400 animate-pulse' : brokerConfigured ? 'bg-amber-400' : 'bg-slate-400'
@@ -225,7 +229,7 @@ export default function Dashboard() {
                   ? 'Connected & Streaming Live Indian Ticks'
                   : brokerConfigured
                   ? 'Credentials Configured (Generate Session Token)'
-                  : 'Setup Required: App ID & Secret Needed'}
+                  : hasAdminAccess ? 'Setup Required: App ID & Secret Needed' : 'Real-time Charting & Zones Active'}
               </div>
             </div>
           </div>
@@ -253,14 +257,16 @@ export default function Dashboard() {
 
         {/* Quick Admin Actions */}
         <div className="flex flex-wrap items-center gap-2">
-          <Link
-            to="/broker"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 transition-all shadow-sm"
-          >
-            <Cpu size={13} />
-            <span>Configure Alice Blue API</span>
-            <ArrowUpRight size={12} />
-          </Link>
+          {hasAdminAccess && (
+            <Link
+              to="/broker"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-[var(--accent-indigo)] text-white hover:brightness-110 transition-all shadow-sm"
+            >
+              <Cpu size={13} />
+              <span>Configure Alice Blue API</span>
+              <ArrowUpRight size={12} />
+            </Link>
+          )}
           <Link
             to="/create"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-[var(--text-secondary)] hover:text-white hover:border-[var(--accent-indigo)] transition-all"

@@ -10,6 +10,8 @@ import {
   CheckCircle2,
   ArrowRight,
   LineChart,
+  Building2,
+  Lock,
 } from 'lucide-react'
 
 export default function AboutUs() {
@@ -43,11 +45,11 @@ export default function AboutUs() {
             <Link to="/privacy" className="text-[var(--text-secondary)] hover:text-white transition-colors">
               Privacy
             </Link>
-            <Link to="/sebi-disclaimer" className="text-[var(--text-secondary)] hover:text-white transition-colors">
-              SEBI Disclaimer
-            </Link>
             <Link to="/refund-policy" className="text-[var(--text-secondary)] hover:text-white transition-colors">
               Refund Policy
+            </Link>
+            <Link to="/cancellation-policy" className="text-[var(--text-secondary)] hover:text-white transition-colors">
+              Cancellation Policy
             </Link>
             <Link to="/contact" className="text-[var(--text-secondary)] hover:text-white transition-colors">
               Contact
@@ -78,7 +80,7 @@ export default function AboutUs() {
             transition={{ delay: 0.05 }}
             className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[var(--text-primary)] mb-4"
           >
-            Empowering Indian Traders with Pure Market Structure
+            About Zonal Edge
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 10 }}
@@ -86,124 +88,93 @@ export default function AboutUs() {
             transition={{ delay: 0.1 }}
             className="text-sm sm:text-base text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed"
           >
-            Zonal Edge was born out of a simple frustration: the Indian retail trading landscape is saturated with chaotic indicators, unverified screenshots, and conflicting tips. We built the antidote.
+            A market analysis and educational platform empowering Indian traders with pure market structure and institutional levels.
           </motion.p>
         </div>
       </div>
 
       {/* Main Content */}
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-16 space-y-16">
-        {/* Mission Statement */}
-        <div className="grid md:grid-cols-2 gap-10 items-center">
-          <div className="space-y-4">
-            <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--accent-indigo)] uppercase tracking-wider">
-              Our Vision
-            </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] leading-snug">
-              We replace analysis paralysis with structural simplicity.
-            </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
-              Most traders don't fail because they lack passion or intelligence. They fail because their charts are crowded with 15 lagging indicators, while their minds are overwhelmed by dozens of social media channels.
-            </p>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
-              At <strong>Zonal Edge</strong>, we believe price action and market structure are supreme. Every single trading day, our models map out the key demand and supply zones where big players react, giving you unambiguous direction and risk boundaries before the market opens.
-            </p>
+        {/* Core Compliance Section - EXACT Text from Requirement 6 */}
+        <div className="p-8 rounded-2xl border-2 border-indigo-500/40 bg-indigo-500/5 shadow-xl space-y-4">
+          <div className="flex items-center gap-2 text-[var(--accent-indigo)] font-bold text-xs uppercase tracking-wider">
+            <Compass size={18} />
+            <span>Platform Overview & Purpose</span>
           </div>
 
-          <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-4">
-            <h3 className="text-base font-bold text-[var(--text-primary)] mb-2">What Zonal Edge Delivers:</h3>
-            <ul className="space-y-3">
-              {[
-                'Daily institutional supply & demand zones for NIFTY 50 and SENSEX',
-                'Clear directional bias statements so you know who controls the session',
-                'Strict invalidation levels so you know exactly when your setup is negated',
-                'Real-time Alice Blue charts with analyst-published zones and levels',
-                'Live Open Interest (OI) analysis tracking real institutional positioning',
-                'Zero buy/sell spam, zero emotional gambling, 100% structured logic',
-              ].map((point, i) => (
-                <li key={i} className="flex items-start gap-2.5 text-xs text-[var(--text-secondary)] leading-relaxed">
-                  <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
-                  <span>{point}</span>
-                </li>
-              ))}
-            </ul>
+          <h2 className="text-2xl font-bold text-white">About Zonal Edge</h2>
+
+          <div className="space-y-4 text-sm sm:text-base leading-relaxed text-slate-200">
+            <p>
+              “Zonal Edge is a market analysis and educational platform designed to help traders understand market structure and key price zones in the Indian stock market, particularly Nifty and Sensex.
+            </p>
+            <p>
+              The platform provides market analysis, bullish and bearish zones, liquidation levels, invalidation levels, and relevant open interest (OI) data to support users in understanding market behaviour and developing their own trading decisions.
+            </p>
+            <p>
+              Zonal Edge is intended for informational and educational purposes. The platform does not guarantee profits or specific trading outcomes. Users are responsible for their own trading decisions and should understand the risks associated with trading in financial markets.”
+            </p>
           </div>
         </div>
 
-        {/* 4 Core Pillars */}
-        <div className="space-y-8">
-          <div className="text-center max-w-2xl mx-auto">
-            <h2 className="text-2xl sm:text-3xl font-bold text-[var(--text-primary)] mb-2">
-              The 4 Pillars of the Zonal Edge Method
-            </h2>
-            <p className="text-xs sm:text-sm text-[var(--text-muted)]">
-              Every analysis, lesson, and chart level we publish is built upon four non-negotiable principles.
-            </p>
+        {/* Legal & Business Entity Information - Requirement 5 */}
+        <div className="p-6 sm:p-8 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-4">
+          <div className="flex items-center gap-2 text-white font-bold text-base">
+            <Building2 size={20} className="text-[var(--accent-indigo)]" />
+            <span>Corporate & Legal Identity</span>
           </div>
-
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3 hover:border-[var(--border-active)] transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 text-[var(--accent-indigo)] flex items-center justify-center">
-                <Layers size={22} />
-              </div>
-              <h3 className="text-base font-bold text-[var(--text-primary)]">1. Precise Zones</h3>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                We identify high-probability zones where institutional liquidity resides — not arbitrary indicator lines.
-              </p>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+            Zonal Edge is owned and operated by <strong>Vedgetechnologies</strong>. All subscription billing, intellectual property, and client compliance are managed under the registered details below:
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1 text-xs">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase font-bold block">Trade Name</span>
+              <p className="text-white font-bold text-sm">Vedgetechnologies</p>
+              <span className="text-[10px] text-[var(--text-muted)] uppercase font-bold block pt-2">Legal Name (Proprietor)</span>
+              <p className="text-white font-bold text-sm">Viknesh</p>
             </div>
 
-            <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3 hover:border-[var(--border-active)] transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
-                <Compass size={22} />
+            <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1 text-xs">
+              <span className="text-[10px] text-[var(--text-muted)] uppercase font-bold block">Registered Address</span>
+              <p className="text-white font-medium">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
+              <div className="pt-2 flex flex-col gap-1 text-[11px] text-[var(--text-muted)]">
+                <span>Official Business Email: <strong className="text-white">support@zonaledge.com</strong></span>
+                <span>Website: <strong className="text-white">https://www.zonaledge.com</strong></span>
               </div>
-              <h3 className="text-base font-bold text-[var(--text-primary)]">2. Clear Bias</h3>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                Know whether the market is bullish above key pivots or weak below resistance. Never trade against prevailing momentum.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3 hover:border-[var(--border-active)] transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-rose-500/10 text-rose-400 flex items-center justify-center">
-                <Shield size={22} />
-              </div>
-              <h3 className="text-base font-bold text-[var(--text-primary)]">3. Invalidation</h3>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                Professional trading is about risk management. We define the exact price point that invalidates the thesis so losses stay small.
-              </p>
-            </div>
-
-            <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3 hover:border-[var(--border-active)] transition-colors">
-              <div className="w-12 h-12 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
-                <Target size={22} />
-              </div>
-              <h3 className="text-base font-bold text-[var(--text-primary)]">4. Dispassionate Execution</h3>
-              <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-                No emotion, no revenge trading, no chasing breakouts. You plan the trade before the session and execute like an institution.
-              </p>
             </div>
           </div>
         </div>
 
-        {/* Feature Highlights: Live Alice Blue Chart */}
-        <div className="p-8 rounded-2xl border border-[var(--border-subtle)] bg-gradient-to-r from-[var(--bg-secondary)] to-[var(--bg-tertiary)] flex flex-col md:flex-row items-center justify-between gap-8">
-          <div className="space-y-3 max-w-xl">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-semibold bg-indigo-500/10 text-[var(--accent-indigo)] border border-indigo-500/20">
-              <LineChart size={13} /> Live Technical Charting
+        {/* Pillars / Features */}
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-indigo-500/10 text-[var(--accent-indigo)] flex items-center justify-center">
+              <Layers size={20} />
             </div>
-            <h3 className="text-2xl font-bold text-[var(--text-primary)]">
-              Live Alice Blue Charts with Analyst-Published Zones
-            </h3>
-            <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
-              Zonal Edge streams real-time NSE/BSE candles from Alice Blue across every timeframe. Our analysts mark supply/demand zones, trendlines and invalidation levels, and every update reaches all subscribers instantly.
+            <h3 className="text-base font-bold text-white">Market Structure & Zones</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              We map institutional liquidity pools, premium/discount price zones, and orderblocks for NIFTY 50 and SENSEX before market open.
             </p>
           </div>
-          <div className="flex flex-col sm:flex-row items-center gap-3 shrink-0">
-            <Link
-              to="/dashboard"
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-[var(--accent-indigo)] text-white text-xs font-semibold hover:brightness-110 transition-all shadow-lg shadow-indigo-500/20"
-            >
-              <BarChart3 size={15} /> Explore Live Chart <ArrowRight size={14} />
-            </Link>
+
+          <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
+              <BarChart3 size={20} />
+            </div>
+            <h3 className="text-base font-bold text-white">Live Open Interest (OI)</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Unpack strike-wise call and put accumulations, change in open interest, and PCR trends to understand big-player positioning.
+            </p>
+          </div>
+
+          <div className="p-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--bg-secondary)] space-y-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center">
+              <Shield size={20} />
+            </div>
+            <h3 className="text-base font-bold text-white">Strict Invalidation Levels</h3>
+            <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+              Every market bias has an objective invalidation line. If the price violates the level, the setup is abandoned — removing emotional bias.
+            </p>
           </div>
         </div>
 
@@ -213,20 +184,20 @@ export default function AboutUs() {
             Ready to trade with clarity?
           </h2>
           <p className="text-xs sm:text-sm text-[var(--text-muted)] max-w-lg mx-auto leading-relaxed">
-            Join disciplined traders who rely on Zonal Edge daily to plan trades, respect invalidation levels, and manage risk properly.
+            Experience the 7-Day Free Trial (₹0) and join disciplined traders who analyze market structure objectively.
           </p>
           <div className="flex flex-wrap items-center justify-center gap-3 pt-2">
             <button
               onClick={() => navigate('/register')}
-              className="px-6 py-2.5 rounded-lg bg-[var(--accent-indigo)] text-white text-xs font-semibold hover:brightness-110 transition-all"
+              className="px-6 py-2.5 rounded-lg bg-[var(--accent-indigo)] text-white text-xs font-semibold hover:brightness-110 transition-all shadow-md"
             >
-              Start 7-Day Free Trial
+              Start 7-Day Free Trial (₹0)
             </button>
             <Link
               to="/contact"
               className="px-6 py-2.5 rounded-lg border border-[var(--border-subtle)] text-xs font-medium text-[var(--text-secondary)] hover:text-white hover:bg-[var(--bg-tertiary)] transition-colors"
             >
-              Contact Our Team
+              Contact Our Desk
             </Link>
           </div>
         </div>
@@ -234,16 +205,19 @@ export default function AboutUs() {
 
       {/* Footer */}
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
-        <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p>© 2025 Zonal Edge. All rights reserved.</p>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <Link to="/terms" className="hover:text-white transition-colors">Terms of Service</Link>
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-left">
+            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
+          </div>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs">
+            <Link to="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link>
             <Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link>
-            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors">SEBI Disclaimer</Link>
             <Link to="/refund-policy" className="hover:text-white transition-colors">Refund Policy</Link>
-            <Link to="/about" className="hover:text-white transition-colors text-[var(--accent-indigo)]">About Us</Link>
-            <Link to="/contact" className="hover:text-white transition-colors">Contact Us</Link>
-            <Link to="/login" className="hover:text-white transition-colors">Sign In</Link>
+            <Link to="/cancellation-policy" className="hover:text-white transition-colors">Cancellation Policy</Link>
+            <Link to="/sebi-disclaimer" className="hover:text-white transition-colors">SEBI Disclaimer</Link>
+            <Link to="/about" className="hover:text-white transition-colors text-white font-semibold">About Us</Link>
+            <Link to="/contact" className="hover:text-white transition-colors">Contact</Link>
           </div>
         </div>
       </footer>

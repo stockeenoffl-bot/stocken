@@ -75,9 +75,9 @@ export default function OI() {
   const [analysisMode, setAnalysisMode] = useState<'intraday' | 'historical'>('intraday')
   const [notesText, setNotesText] = useState('')
 
-  // Auth and Admin Edit Mode
-  const { profile } = useAuth()
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  // Auth and Admin/Editor Edit Mode
+  const { profile, hasEditorAccess } = useAuth()
+  const canEditOI = hasEditorAccess || profile?.role === 'admin' || profile?.role === 'super_admin' || profile?.role === 'editor' || profile?.role === 'analyst'
   const [isEditMode, setIsEditMode] = useState(false)
   const [rawOiData, setRawOiData] = useState<OIData[]>([])
   const [saving, setSaving] = useState(false)
@@ -700,7 +700,7 @@ export default function OI() {
                 <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
               </button>
 
-              {isAdmin && (
+              {canEditOI && (
                 <button
                   onClick={() => setIsEditMode(!isEditMode)}
                   className={`py-1 px-3 rounded-md text-xs font-semibold shadow-md transition-colors ${
@@ -857,8 +857,8 @@ export default function OI() {
               ) : null}
             </div>
             
-            {/* Admin Edit Mode Table */}
-            {isEditMode && isAdmin && (
+            {/* Admin/Editor Edit Mode Table */}
+            {isEditMode && canEditOI && (
               <div className="mt-6 border-t border-[var(--border-subtle)] pt-4">
                 <div className="flex justify-between items-center mb-4">
                   <h4 className="text-sm font-bold text-[var(--text-primary)]">Edit Option Chain ({analysisIndex})</h4>
