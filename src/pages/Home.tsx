@@ -5,7 +5,7 @@ import {
   TrendingDown,
   FileText,
   BarChart3,
-  Target,
+  Shield,
   Lock,
   Megaphone,
   Radio,
@@ -15,7 +15,6 @@ import {
 } from 'lucide-react'
 import LiveChart from '@/components/charts/LiveChart'
 import StatCard from '@/components/StatCard'
-import { Globe } from 'lucide-react'
 import { useMarket } from '@/contexts/MarketContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useLiveMarket } from '@/hooks/useLiveMarket'
@@ -131,14 +130,14 @@ export default function Home() {
           icon={effectiveBias === 'bullish' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
         />
         <StatCard
-          label="Target / Resistance"
-          value={`${liveData.resistanceZone?.from || '-'} - ${liveData.resistanceZone?.to || '-'}`}
+          label="Support / Resistance"
+          value={`${liveData.resistanceZone?.from || liveData.supportZone?.from || '-'} - ${liveData.resistanceZone?.to || liveData.supportZone?.to || '-'}`}
           sentiment="bullish"
-          sublabel="Key breakout zone"
-          icon={<Target size={18} />}
+          sublabel="Key price zone"
+          icon={<Shield size={18} />}
         />
         <StatCard
-          label="Invalid Below"
+          label="Invalid Below/Above"
           value={effectiveInvalidation}
           sentiment="bearish"
           sublabel="Trend invalidation"
@@ -199,7 +198,7 @@ export default function Home() {
 
         <LiveChart
           symbol={market}
-          height={500}
+          height={620}
           defaultTimeframe={liveData.chartTimeframe || '15m'}
           defaultRange={liveData.chartRange || '1W'}
           bullishZone={published ? liveData.bullishZone || liveData.supportZone : undefined}
@@ -213,15 +212,15 @@ export default function Home() {
       {/* Detailed Analysis Content */}
       <motion.div variants={itemVariants} className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Analysis Details - 100% Unlocked for All Users */}
-        <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)] relative overflow-hidden">
-          <div className="flex items-center gap-2 mb-4">
-            <FileText size={16} className="text-[var(--accent-indigo)]" />
-            <h3 className="text-sm font-semibold text-[var(--text-primary)]">Detailed Notes & Analysis</h3>
-          </div>
-          
-          <div className="space-y-4">
-            <div>
-              <div className="flex items-center justify-between mb-2">
+        <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)] relative overflow-hidden flex flex-col justify-between shadow-sm">
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <FileText size={16} className="text-[var(--accent-indigo)]" />
+              <h3 className="text-sm font-semibold text-[var(--text-primary)]">Detailed Notes & Analysis</h3>
+            </div>
+            
+            <div className="space-y-3">
+              <div className="flex items-center justify-between mb-1">
                 <span className="text-[10px] uppercase font-bold text-[var(--accent-indigo)]">
                   Live Commentary ({market})
                 </span>
@@ -243,9 +242,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Support & Resistance Zones + Session Expectations */}
-        <div className="space-y-4">
-          <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)]">
+        {/* Support & Resistance Zones */}
+        <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)] flex flex-col justify-between shadow-sm">
+          <div>
             <div className="flex items-center justify-between mb-3">
               <h4 className="text-xs font-semibold text-[var(--text-primary)]">Key Trading Zones</h4>
               <span className="text-[9px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
@@ -253,7 +252,7 @@ export default function Home() {
               </span>
             </div>
             
-            <div className="space-y-2.5">
+            <div className="space-y-3 pt-1">
               <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
                 <span className="text-emerald-400 font-bold">Support / Bullish Zone</span>
                 <span className="font-mono font-bold text-[var(--text-primary)]">
@@ -270,60 +269,6 @@ export default function Home() {
                 <span className="text-amber-400 font-bold">Invalidation Level</span>
                 <span className="font-mono font-bold text-[var(--text-primary)]">
                   {effectiveInvalidation}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Published Session Expectations (Asian, London, New York) */}
-          <div className="rounded-lg border p-4 bg-[var(--bg-secondary)] border-[var(--border-subtle)] space-y-3">
-            <div className="flex items-center justify-between">
-              <h4 className="text-xs font-semibold text-[var(--text-primary)] flex items-center gap-1.5">
-                <Globe size={14} className="text-indigo-400" />
-                <span>Session Expectations</span>
-              </h4>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 font-bold border border-indigo-500/20">
-                GLOBAL SESSIONS
-              </span>
-            </div>
-
-            <div className="space-y-2 pt-1 text-xs">
-              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
-                <span className="text-slate-300 font-medium">Asian Session</span>
-                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
-                  (liveData.sessions?.asian || 'Neutral') === 'Neutral'
-                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    : (liveData.sessions?.asian || 'Neutral') === 'Bullish'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                }`}>
-                  {liveData.sessions?.asian || 'Neutral'}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
-                <span className="text-slate-300 font-medium">London Session</span>
-                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
-                  (liveData.sessions?.london || 'Bullish') === 'Bullish'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : (liveData.sessions?.london || 'Bullish') === 'Bearish'
-                    ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                    : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                }`}>
-                  {liveData.sessions?.london || 'Bullish'}
-                </span>
-              </div>
-
-              <div className="flex items-center justify-between p-2 rounded-lg bg-[var(--bg-tertiary)] border border-[var(--border-subtle)]">
-                <span className="text-slate-300 font-medium">New York Session</span>
-                <span className={`px-2.5 py-0.5 rounded text-[11px] font-bold border ${
-                  (liveData.sessions?.newYork || 'Volatile') === 'Volatile'
-                    ? 'bg-blue-500/20 text-blue-300 border-blue-500/40'
-                    : (liveData.sessions?.newYork || 'Volatile') === 'Bullish'
-                    ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                    : 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-                }`}>
-                  {liveData.sessions?.newYork || 'Volatile'}
                 </span>
               </div>
             </div>

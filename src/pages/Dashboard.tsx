@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   FileText,
   BarChart3,
+  Shield,
   Target,
   Cpu,
   ArrowUpRight,
@@ -325,14 +326,14 @@ export default function Dashboard() {
                   icon={liveData.bias === 'bullish' ? <TrendingUp size={18} /> : <TrendingDown size={18} />}
                 />
                 <StatCard
-                  label="Target / Resistance"
-                  value={`${liveData.resistanceZone?.from || '-'} - ${liveData.resistanceZone?.to || '-'}`}
+                  label="Support / Resistance"
+                  value={`${liveData.resistanceZone?.from || liveData.supportZone?.from || '-'} - ${liveData.resistanceZone?.to || liveData.supportZone?.to || '-'}`}
                   sentiment="bullish"
-                  sublabel="Key target zone"
-                  icon={<Target size={18} />}
+                  sublabel="Key price zone"
+                  icon={<Shield size={18} />}
                 />
                 <StatCard
-                  label="Invalid Below"
+                  label="Invalid Below/Above"
                   value={String(liveData.invalidationLevel)}
                   sentiment="bearish"
                   sublabel="Trend invalidation"
@@ -548,7 +549,7 @@ export default function Dashboard() {
                 </div>
                 <LiveChart
                   symbol={market}
-                  height={540}
+                  height={620}
                   defaultTimeframe={liveData.chartTimeframe || '15m'}
                   defaultRange={liveData.chartRange || '1W'}
                   bullishZone={liveData.bullishZone || liveData.supportZone}
