@@ -12,6 +12,7 @@ import {
 } from 'lightweight-charts'
 import {
   AlertTriangle,
+  Clock,
   Crosshair,
   Loader2,
   Maximize2,
@@ -32,6 +33,7 @@ import {
 import { aliceBlueService, type AliceBlueQuote, type HistoryResponse } from '@/services/aliceBlueService'
 import { marketDataService } from '@/services/marketDataService'
 import {
+  IST_OFFSET,
   RANGES,
   TIMEFRAMES,
   bucketStart,
@@ -47,7 +49,39 @@ import type { ChartDrawing, DrawingType, ZoneDefinition } from '@/types/chart'
 export type { ChartDrawing, ZoneDefinition }
 
 const BAR_SECONDS: Record<string, number> = {
-  '1m': 60, '5m': 300, '15m': 900, '30m': 1800, '1H': 3600, '4H': 14400, D: 86400, W: 604800, M: 2629800,
+  '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '1H': 3600, '4H': 14400, D: 86400, W: 604800, M: 2629800,
+}
+
+const MINUTES_MAP: Record<string, number> = {
+  '1m': 1, '3m': 3, '5m': 5, '15m': 15, '30m': 30, '1H': 60, '4H': 240,
+}
+
+/**
+ * Calculates remaining candle time in reverse format (e.g. 5m starts 05:00 -> 04:59 -> ... -> 00:00).
+ * When it hits 00:00 the candle ends and it restarts from the timeframe duration.
+ */
+export function getCandleCountdown(tf: string, nowSec = Math.floor(Date.now() / 1000)): string {
+  const mins = MINUTES_MAP[tf] || (tf === '1m' ? 1 : tf === '3m' ? 3 : tf === '5m' ? 5 : tf === '15m' ? 15 : tf === '30m' ? 30 : tf === '1H' ? 60 : tf === '4H' ? 240 : 0)
+  if (mins) {
+    const duration = mins * 60
+    const start = bucketStart(tf, nowSec)
+    const elapsed = Math.max(0, nowSec - start)
+    const rem = Math.max(0, duration - 1 - (elapsed % duration))
+    const m = Math.floor(rem / 60)
+    const s = rem % 60
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+  if (tf === 'D') {
+    const ist = nowSec + IST_OFFSET
+    const dayStart = Math.floor(ist / 86400) * 86400
+    const closeSec = dayStart + 15 * 3600 + 30 * 60 - IST_OFFSET
+    const diff = Math.max(0, closeSec - nowSec)
+    const h = Math.floor(diff / 3600)
+    const m = Math.floor((diff % 3600) / 60)
+    const s = diff % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  }
+  return ''
 }
 
 const QUICK_SYMBOLS = ['NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'INDIA VIX']
@@ -98,12 +132,12 @@ export default function LiveChart({
   const volumeRef = useRef<ISeriesApi<'Histogram'> | null>(null)
   const dataRef = useRef<Array<{ time: number; open: number; high: number; low: number; close: number; volume: number }>>([])
   const fitNextRef = useRef(true)
-  const atRightRef = useRef(true) // user is watching the newest bar -> follow it
   const restoringRef = useRef(false) // true while we programmatically restore the view
   const rafRef = useRef(0)
 
   const [timeframe, setTimeframe] = useState<Timeframe>(defaultTimeframe)
   const [range, setRange] = useState<RangeKey>(defaultRange)
+  const [candleCountdown, setCandleCountdown] = useState<string>(() => getCandleCountdown(defaultTimeframe))
   const [fullscreen, setFullscreen] = useState(false)
   const [tool, setTool] = useState<Tool>('cursor')
   const [loading, setLoading] = useState(true)
@@ -119,6 +153,16 @@ export default function LiveChart({
   const [searchText, setSearchText] = useState('')
   const [searchResults, setSearchResults] = useState<Array<{ symbol: string; ref: string; name: string; exchange: string }>>([])
   const lastPriceRef = useRef(0)
+
+  // 1-second interval to update candle close countdown timer in reverse
+  useEffect(() => {
+    const tick = () => {
+      setCandleCountdown(getCandleCountdown(timeframe))
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [timeframe])
 
   // Admin pushed a new default view -> follow it
   useEffect(() => { setTimeframe(defaultTimeframe) }, [defaultTimeframe])
@@ -174,14 +218,7 @@ export default function LiveChart({
     volumeRef.current = volume
 
     const onRange = () => {
-      // Ignore the range events our own restore/fit calls generate, otherwise
-      // they would immediately flip atRightRef back to true and snap the chart
-      // to the right edge again.
       if (restoringRef.current) return
-      const ts = chart.timeScale()
-      const range = ts.getVisibleLogicalRange()
-      const n = dataRef.current.length
-      atRightRef.current = !range || !n || range.to >= n - 3
       scheduleOverlay()
     }
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRange)
@@ -229,7 +266,6 @@ export default function LiveChart({
 
     // Remember where the user is looking BEFORE any write.
     const savedRange = chart && !fitNextRef.current ? chart.timeScale().getVisibleLogicalRange() : null
-    const savedRight = atRightRef.current
     const oldFirstTime = old.length ? old[0].time : null
 
     // A refresh is "incremental" when the existing bars are still a prefix of
@@ -276,26 +312,16 @@ export default function LiveChart({
       // First load / symbol or timeframe change -> show the default view
       chart?.timeScale().fitContent()
       fitNextRef.current = false
-      atRightRef.current = true
-    } else if (incremental) {
-      // Nothing to restore: the scale was never reset. Just keep following the
-      // newest bar if that is what the user was doing.
-      if (savedRight) chart?.timeScale().scrollToRealTime()
-    } else if (savedRight) {
-      // User was following the newest bar -> keep following it
-      atRightRef.current = true
-      chart?.timeScale().scrollToRealTime()
-    } else if (savedRange) {
-      // User panned/zoomed somewhere -> restore EXACTLY that window (no snapping back).
-      // Bars appended at the end keep their indices, so the window is still valid.
-      // If older bars were prepended, shift the window so the same candles stay put.
-      atRightRef.current = false
+    } else if (savedRange && !incremental) {
+      // When a full setData() occurs, restore the user's exact pan and zoom offset
+      // so the chart NEVER recenters or snaps away from their desired position.
       const shift = oldFirstTime !== null && rows.length && rows[0].time !== oldFirstTime
         ? rows.findIndex((r) => r.time >= oldFirstTime)
         : 0
       const delta = shift > 0 ? shift : 0
       chart?.timeScale().setVisibleLogicalRange({ from: savedRange.from + delta, to: savedRange.to + delta })
     }
+    // When incremental, series.update() already kept the user's exact visible range untouched.
     // lightweight-charts emits range-change events asynchronously, so keep the
     // suppression flag up for a couple of frames.
     requestAnimationFrame(() => requestAnimationFrame(() => { restoringRef.current = false }))
@@ -383,8 +409,9 @@ export default function LiveChart({
         // silently kill the whole tick stream - so skip the candle write instead.
         return
       }
-      // Keep the newest candle in view ONLY when the user is watching the right edge
-      if (atRightRef.current) chartRef.current?.timeScale().scrollToRealTime()
+      // Never force scrollToRealTime() on quote ticks: series.update() already
+      // repaints the latest candle in place without changing the user's desired
+      // pan/offset.
       scheduleOverlay()
     })
     return unsubscribe
@@ -506,6 +533,7 @@ export default function LiveChart({
   const lastCandle = dataRef.current[dataRef.current.length - 1]
   const shown = hover || (lastCandle ? { open: lastCandle.open, high: lastCandle.high, low: lastCandle.low, close: lastCandle.close } : null)
   const liveLtp = quote?.ltp ?? lastCandle?.close
+  const priceY = liveLtp !== undefined ? yFromPrice(liveLtp) : null
   const change = quote ? quote.change : 0
   const changePct = quote ? quote.changePercent : 0
   const isUp = change >= 0
@@ -593,13 +621,11 @@ export default function LiveChart({
     onViewChange?.({ timeframe: tf, range: r })
   }
 
-  /** Snap the chart back to the default view (fit all candles, follow live). */
+  /** Snap the chart back to the default view (fit all candles). */
   const resetView = () => {
-    atRightRef.current = true
     restoringRef.current = true
     chartRef.current?.timeScale().fitContent()
     fitNextRef.current = false
-    chartRef.current?.timeScale().scrollToRealTime()
     requestAnimationFrame(() => { restoringRef.current = false })
     scheduleOverlay()
   }
@@ -699,6 +725,15 @@ export default function LiveChart({
               </button>
             ))}
           </div>
+          {candleCountdown && (
+            <div
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-[#141B2E] border border-sky-500/30 text-sky-400 font-mono text-[11px] font-bold shadow-sm"
+              title={`Candle close countdown for ${timeframe} (starts reverse from ${timeframe} to 00:00)`}
+            >
+              <Clock size={11} className="text-sky-400 animate-pulse" />
+              <span>{candleCountdown}</span>
+            </div>
+          )}
           <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-[#141B2E] border border-[#1A2234]">
             {RANGES.map((r) => (
               <button key={r} onClick={() => changeView(timeframe, r)}
@@ -785,6 +820,22 @@ export default function LiveChart({
             {drawings.map((d) => renderDrawing(d))}
             {(() => { const dd = draftAsDrawing(); return dd ? renderDrawing(dd, true) : null })()}
           </svg>
+
+          {/* Price scale candle countdown (underneath current LTP label, TradingView-style) */}
+          {candleCountdown && priceY !== null && priceY > 12 && priceY < (containerRef.current?.clientHeight ?? height) - 25 && (
+            <div
+              className="absolute z-20 pointer-events-none select-none font-mono text-[10px] font-bold tracking-tight text-slate-200 bg-[#141B2D]/95 border border-[#2B3B5E] rounded px-1.5 py-0.5 shadow-md text-center"
+              style={{
+                right: 4,
+                top: Math.round(priceY + 12),
+                minWidth: 46,
+                lineHeight: '13px',
+              }}
+              title={`Candle close countdown (${timeframe})`}
+            >
+              {candleCountdown}
+            </div>
+          )}
 
           {loading && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-[#0A0D16]/70 pointer-events-none">
