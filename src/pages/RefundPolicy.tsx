@@ -156,7 +156,7 @@ export default function RefundPolicy() {
           </div>
           <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
             <p>
-              Before completing any payment through our gateway (Razorpay), users are presented with the plan details, duration, included features, and this non-refundable policy. Completing the payment signifies your unequivocal understanding and agreement that all fees are final.
+              Before completing any payment through our secure payment gateway, users are presented with the plan details, duration, included features, and this non-refundable policy. Completing the payment signifies your unequivocal understanding and agreement that all fees are final.
             </p>
             <p>
               For cancellation details during or after the free trial period, please refer to our{' '}

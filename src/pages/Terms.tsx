@@ -257,7 +257,7 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  All subscription payments are denominated in Indian Rupees (INR) and processed securely through RBI-authorized payment gateways (e.g. Razorpay).
+                  All subscription payments are denominated in Indian Rupees (INR) and processed securely through RBI-authorized, PCI-DSS compliant payment gateways.
                 </p>
                 <p>
                   Users must provide valid billing credentials. By initiating a transaction, you authorize our payment processor to charge the applicable subscription fee.

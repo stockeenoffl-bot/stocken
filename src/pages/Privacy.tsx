@@ -214,16 +214,16 @@ export default function Privacy() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  All online payments and subscription billing are processed securely through certified, RBI-authorized payment aggregators, primarily <strong>Razorpay</strong>.
+                  All online payments and subscription billing are processed securely through certified, RBI-authorized payment aggregators and gateways.
                 </p>
                 <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-1.5">
                   <p className="font-bold text-emerald-300">PCI-DSS Level 1 Compliance</p>
                   <p className="text-[11px] text-emerald-200">
-                    Zonal Edge <strong>NEVER stores, processes, or views your raw credit/debit card numbers, CVVs, or net banking passwords</strong>. All financial transactions are directly tokenized and processed within Razorpay's PCI-DSS compliant secure vaults.
+                    Zonal Edge <strong>NEVER stores, processes, or views your raw credit/debit card numbers, CVVs, or net banking passwords</strong>. All financial transactions are directly tokenized and processed within certified PCI-DSS Level 1 compliant secure banking vaults.
                   </p>
                 </div>
                 <p>
-                  We store only non-sensitive transactional identifiers (such as Razorpay Order ID, Payment ID, amount paid in INR, payment timestamp, and payment status) for accounting, taxation, and subscription provisioning.
+                  We store only non-sensitive transactional identifiers (such as Payment Order ID, Transaction Reference ID, amount paid in INR, payment timestamp, and payment status) for accounting, taxation, and subscription provisioning.
                 </p>
               </div>
             </section>
@@ -237,7 +237,7 @@ export default function Privacy() {
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>We work only with vetted, enterprise-grade third-party service providers:</p>
                 <ul className="list-disc pl-5 space-y-1.5">
-                  <li><strong>Razorpay:</strong> Payment processing and subscription invoicing.</li>
+                  <li><strong>Authorized Payment Gateways:</strong> Secure PCI-DSS Level 1 payment processing and subscription invoicing.</li>
                   <li><strong>Supabase:</strong> Encrypted user authentication, profile data, and database storage.</li>
                   <li><strong>Alice Blue API:</strong> Streaming real-time market quotes and historical candlestick feeds.</li>
                 </ul>

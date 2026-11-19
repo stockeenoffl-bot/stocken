@@ -360,7 +360,7 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
                       {isCurrent ? 'Current Active Plan' : `Upgrade to ${plan.name}`}
                     </button>
                     <p className="text-[9px] text-center text-[var(--text-muted)] mt-1.5">
-                      {plan.price === 0 ? 'Full 7-Day Access' : 'Secure Razorpay Checkout'}
+                      {plan.price === 0 ? 'Full 7-Day Access' : 'Secure Instant Checkout'}
                     </p>
                   </div>
                 </div>
@@ -462,7 +462,7 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
       <div>
         <h1 className="text-xl font-bold text-[var(--text-primary)]">Subscription & Billing Management</h1>
         <p className="text-xs mt-1 text-[var(--text-muted)]">
-          Manage invoices, incoming Razorpay webhook captures, and promotional coupons.
+          Manage invoices, incoming payment gateway webhook captures, and promotional coupons.
         </p>
       </div>
 
@@ -540,7 +540,7 @@ export default function Subscriptions({ isClient = false }: { isClient?: boolean
               <div className="pb-4 border-b border-[var(--border-subtle)]">
                 <h3 className="text-sm font-semibold text-[var(--text-primary)]">Successful Payments</h3>
                 <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
-                  Completed transactions confirmed on Razorpay.
+                  Completed transactions confirmed by payment gateway.
                 </p>
               </div>
 
