@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { marketDataService } from '@/services/marketDataService'
-import type { OIData, OptionChainRow } from '@/services/marketDataService'
+import type { OIData, OptionChainRow, Candle } from '@/services/marketDataService'
 import { aliceBlueService } from '@/services/aliceBlueService'
 import { isMarketOpenIST } from '@/lib/candles'
 import { toast } from 'sonner'
@@ -80,7 +80,8 @@ function generateIntradayOiRows(
   intervalStr: string,
   selectedDate: string,
   quote: { ltp: number; high: number; low: number; open: number; prevClose?: number } | null,
-  liveSnapshots: Array<{ ts: number; rows: OptionChainRow[] }>
+  liveSnapshots: Array<{ ts: number; rows: OptionChainRow[] }>,
+  candles?: Candle[]
 ): OiChangeRow[] {
   const norm = String(market || '').toUpperCase()
   let basePrice = 24148.20
@@ -153,8 +154,21 @@ function generateIntradayOiRows(
     const currentPrice = openPrice + trend + (wave * (basePrice * 0.003))
 
     const candleSpread = Math.max(6, basePrice * 0.0018)
-    const intervalHigh = +(currentPrice + Math.abs(wave) * candleSpread).toFixed(2)
-    const intervalLow = +(currentPrice - (1 - Math.abs(wave)) * candleSpread).toFixed(2)
+    let intervalHigh = +(currentPrice + Math.abs(wave) * candleSpread).toFixed(2)
+    let intervalLow = +(currentPrice - (1 - Math.abs(wave)) * candleSpread).toFixed(2)
+
+    // If real spot index candles are available from Alice Blue, use their exact high and low
+    if (candles && candles.length > 0) {
+      const match = candles.find((c) => {
+        const cDate = new Date(c.time * 1000)
+        const cMins = (cDate.getUTCHours() * 60 + cDate.getUTCMinutes() + 330) % 1440
+        return Math.abs(cMins - minOfDay) < intervalMins
+      })
+      if (match) {
+        intervalHigh = match.high
+        intervalLow = match.low
+      }
+    }
 
     let dhb: 'High Break' | 'Low Break' | null = null
     if (idx === 0) {
@@ -345,6 +359,25 @@ export default function OI() {
   // Rolling snapshots of the live chain -> powers the "OI Change" table.
   const snapshotsRef = useRef<Array<{ ts: number; rows: OptionChainRow[] }>>([])
   const [snapshotCount, setSnapshotCount] = useState(0)
+  const [intradayCandles, setIntradayCandles] = useState<Candle[]>([])
+  const [clockTick, setClockTick] = useState(() => Date.now())
+
+  // Heartbeat: ticks every 5 seconds so when time crosses 3:00 / 3:05, the new row appears instantly without refresh
+  useEffect(() => {
+    const t = setInterval(() => {
+      setClockTick(Date.now())
+    }, 5000)
+    return () => clearInterval(t)
+  }, [])
+
+  // Fetch real 5m candles for Day High / Low break calculations
+  useEffect(() => {
+    const sym = market === 'NIFTY' ? 'NIFTY 50' : market === 'SENSEX' ? 'SENSEX' : market === 'NIFTYBANK' ? 'BANKNIFTY' : 'FINNIFTY'
+    const tf = interval === '15 min' ? '15m' : interval === '30 min' ? '30m' : '5m'
+    marketDataService.getCandles(sym, tf as any, '1D').then((cds) => {
+      if (cds && cds.length) setIntradayCandles(cds)
+    }).catch(() => {})
+  }, [market, interval, clockTick])
 
   // Sync market and analysisIndex
   const handleMarketChange = (newMarket: string) => {
@@ -369,9 +402,10 @@ export default function OI() {
       interval,
       selectedDate,
       currentQuote,
-      snapshotsRef.current
+      snapshotsRef.current,
+      intradayCandles
     )
-  }, [market, interval, selectedDate, currentQuote, snapshotCount, chainRows])
+  }, [market, interval, selectedDate, currentQuote, snapshotCount, chainRows, intradayCandles, clockTick])
 
   // Data for "Show Graph View"
   const graphData = useMemo(() => {
