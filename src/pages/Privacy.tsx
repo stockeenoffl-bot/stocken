@@ -110,7 +110,7 @@ export default function Privacy() {
             transition={{ delay: 0.1 }}
             className="text-sm text-[var(--text-secondary)] max-w-2xl mx-auto leading-relaxed"
           >
-            Last Updated: November 2026. This Privacy Policy details how Vedgetechnologies ("Zonal Edge") collects, protects, stores, and handles your personal information.
+            Last Updated: November 2026. This Privacy Policy details how Zonal Edge collects, protects, stores, and handles your personal information.
           </motion.p>
         </div>
       </div>
@@ -155,7 +155,7 @@ export default function Privacy() {
                   <span>Data Fiduciary & Business Operator</span>
                 </div>
                 <p className="text-xs text-indigo-200 leading-relaxed">
-                  Zonal Edge (https://www.zonaledge.com) is operated by <strong>Vedgetechnologies</strong>, having its principal place of business at <strong>4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</strong>. Represented by its legal proprietor <strong>Viknesh</strong>.
+                  This website is operated by <strong>Zonal Edge</strong>, having its principal place of business at <strong>4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</strong>. Represented by its legal proprietor <strong>Viknesh</strong>.
                 </p>
               </div>
 
@@ -165,7 +165,7 @@ export default function Privacy() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  At Vedgetechnologies, we respect your privacy and are committed to safeguarding your personal data in accordance with the Digital Personal Data Protection Act, 2023 (DPDPA) and the Information Technology Act, 2000 of India.
+                  At Zonal Edge, we respect your privacy and are committed to safeguarding your personal data in accordance with the Digital Personal Data Protection Act, 2023 (DPDPA) and the Information Technology Act, 2000 of India.
                 </p>
               </div>
             </section>
@@ -219,7 +219,7 @@ export default function Privacy() {
                 <div className="p-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-1.5">
                   <p className="font-bold text-emerald-300">PCI-DSS Level 1 Compliance</p>
                   <p className="text-[11px] text-emerald-200">
-                    Zonal Edge and Vedgetechnologies <strong>NEVER store, process, or view your raw credit/debit card numbers, CVVs, or net banking passwords</strong>. All financial transactions are directly tokenized and processed within Razorpay's PCI-DSS compliant secure vaults.
+                    Zonal Edge <strong>NEVER stores, processes, or views your raw credit/debit card numbers, CVVs, or net banking passwords</strong>. All financial transactions are directly tokenized and processed within Razorpay's PCI-DSS compliant secure vaults.
                   </p>
                 </div>
                 <p>
@@ -302,7 +302,7 @@ export default function Privacy() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  Vedgetechnologies acts as the Data Fiduciary. By creating an account and selecting the consent checkbox, you grant lawful, specific, and informed consent for data processing strictly as described herein. You may withdraw consent at any time by closing your account.
+                  Zonal Edge acts as the Data Fiduciary. By creating an account and selecting the consent checkbox, you grant lawful, specific, and informed consent for data processing strictly as described herein. You may withdraw consent at any time by closing your account.
                 </p>
               </div>
             </section>
@@ -319,7 +319,7 @@ export default function Privacy() {
                 </p>
                 <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-1.5 font-mono text-[11px]">
                   <p className="text-white font-bold">Grievance Officer: Viknesh</p>
-                  <p className="text-slate-300">Entity: Vedgetechnologies (Zonal Edge)</p>
+                  <p className="text-slate-300">Entity: Zonal Edge</p>
                   <p className="text-slate-300">Registered Office: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
                   <p className="text-slate-300">Official Email: support@zonaledge.com</p>
                   <p className="text-slate-300">Website: https://www.zonaledge.com</p>
@@ -334,7 +334,7 @@ export default function Privacy() {
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-left">
-            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="font-semibold text-[var(--text-primary)]">Zonal Edge</p>
             <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs">

@@ -159,7 +159,7 @@ export default function Terms() {
                       Website Operator Identification
                     </h3>
                     <p className="text-xs text-indigo-200/90 leading-relaxed">
-                      <strong>This website is operated by Vedgetechnologies.</strong> All services, subscriptions, and analytical materials offered on Zonal Edge (https://www.zonaledge.com) are governed and provided under the legal trade name <strong>Vedgetechnologies</strong>, represented by its legal proprietor <strong>Viknesh</strong>.
+                      <strong>This website is operated by Zonal Edge.</strong> All services, subscriptions, and analytical materials offered on Zonal Edge (https://www.zonaledge.com) are governed and provided under the trade name <strong>Zonal Edge</strong>, represented by its legal proprietor <strong>Viknesh</strong>.
                     </p>
                   </div>
                 </div>
@@ -171,10 +171,10 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  Throughout this document, the terms "we", "us", "our", and "Zonal Edge" refer to the operational entity <strong>Vedgetechnologies</strong>, having its registered office at:
+                  Throughout this document, the terms "we", "us", "our", and "Zonal Edge" refer to the operational entity <strong>Zonal Edge</strong>, represented by its legal proprietor Viknesh, having its registered office at:
                 </p>
                 <div className="p-4 rounded-lg bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-1 font-mono text-[11px]">
-                  <p className="text-white font-bold">Trade Name: Vedgetechnologies</p>
+                  <p className="text-white font-bold">Trade Name: Zonal Edge</p>
                   <p className="text-slate-300">Legal Name: Viknesh</p>
                   <p className="text-slate-300">Registered Address: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
                   <p className="text-slate-300">Website: https://www.zonaledge.com</p>
@@ -328,7 +328,7 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  All proprietary content, brand assets, user interface designs, mathematical models, and zone interpretations are the intellectual property of <strong>Vedgetechnologies</strong>.
+                  All proprietary content, brand assets, user interface designs, mathematical models, and zone interpretations are the intellectual property of <strong>Zonal Edge</strong>.
                 </p>
               </div>
             </section>
@@ -341,7 +341,7 @@ export default function Terms() {
               </h2>
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>
-                  Under no circumstances shall Vedgetechnologies, Viknesh, or Zonal Edge analysts be liable for any trading losses, loss of profits, slippage, market gaps, or consequential damages resulting from the use or inability to use the platform.
+                  Under no circumstances shall Zonal Edge, Viknesh, or Zonal Edge analysts be liable for any trading losses, loss of profits, slippage, market gaps, or consequential damages resulting from the use or inability to use the platform.
                 </p>
               </div>
             </section>
@@ -368,7 +368,7 @@ export default function Terms() {
               <div className="space-y-3 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <p>For inquiries, support, or legal questions regarding these Terms, please reach out to:</p>
                 <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-subtle)] space-y-1.5">
-                  <p className="font-bold text-white">Vedgetechnologies (Zonal Edge)</p>
+                  <p className="font-bold text-white">Zonal Edge</p>
                   <p className="text-[var(--text-muted)]">Proprietor / Legal Name: Viknesh</p>
                   <p className="text-[var(--text-muted)]">Registered Address: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
                   <p className="text-[var(--text-muted)]">Business Email: support@zonaledge.com</p>
@@ -384,7 +384,7 @@ export default function Terms() {
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-left">
-            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="font-semibold text-[var(--text-primary)]">Zonal Edge</p>
             <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs">

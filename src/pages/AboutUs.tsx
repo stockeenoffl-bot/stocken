@@ -124,12 +124,12 @@ export default function AboutUs() {
             <span>Corporate & Legal Identity</span>
           </div>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
-            Zonal Edge is owned and operated by <strong>Vedgetechnologies</strong>. All subscription billing, intellectual property, and client compliance are managed under the registered details below:
+            This website is operated by <strong>Zonal Edge</strong>. All subscription billing, intellectual property, and client compliance are managed under the registered details below:
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
             <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] space-y-1 text-xs">
               <span className="text-[10px] text-[var(--text-muted)] uppercase font-bold block">Trade Name</span>
-              <p className="text-white font-bold text-sm">Vedgetechnologies</p>
+              <p className="text-white font-bold text-sm">Zonal Edge</p>
               <span className="text-[10px] text-[var(--text-muted)] uppercase font-bold block pt-2">Legal Name (Proprietor)</span>
               <p className="text-white font-bold text-sm">Viknesh</p>
             </div>
@@ -207,7 +207,7 @@ export default function AboutUs() {
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-left">
-            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="font-semibold text-[var(--text-primary)]">Zonal Edge</p>
             <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs">

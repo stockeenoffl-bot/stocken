@@ -412,9 +412,9 @@ export default function Register() {
 
               <div className="p-6 overflow-y-auto space-y-4 text-xs leading-relaxed text-[var(--text-secondary)]">
                 <div className="p-3 rounded-lg border border-indigo-500/30 bg-indigo-500/10 space-y-1">
-                  <p className="font-bold text-white">Operated by Vedgetechnologies</p>
+                  <p className="font-bold text-white">This website is operated by Zonal Edge</p>
                   <p className="text-[11px] text-indigo-200">
-                    Trade Name: Vedgetechnologies &middot; Legal Name: Viknesh &middot; Registered Address: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India.
+                    Trade Name: Zonal Edge &middot; Legal Name: Viknesh &middot; Registered Address: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India.
                   </p>
                 </div>
 

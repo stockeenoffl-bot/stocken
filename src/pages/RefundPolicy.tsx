@@ -176,8 +176,8 @@ export default function RefundPolicy() {
             </h3>
           </div>
           <div className="p-4 rounded-xl bg-[var(--bg-tertiary)] border border-[var(--border-subtle)] text-xs space-y-1.5">
-            <p className="font-bold text-white">Vedgetechnologies (Operates Zonal Edge)</p>
-            <p className="text-[var(--text-muted)]">Legal Name: Viknesh</p>
+            <p className="font-bold text-white">Zonal Edge</p>
+            <p className="text-[var(--text-muted)]">Trade Name: Zonal Edge &middot; Legal Name: Viknesh</p>
             <p className="text-[var(--text-muted)]">Registered Address: 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
             <p className="text-[var(--text-muted)]">Official Email: support@zonaledge.com</p>
             <p className="text-[var(--text-muted)]">Website: https://www.zonaledge.com</p>
@@ -189,7 +189,7 @@ export default function RefundPolicy() {
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-secondary)] py-8 px-4 text-center text-xs text-[var(--text-muted)]">
         <div className="max-w-5xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="text-left">
-            <p className="font-semibold text-[var(--text-primary)]">Vedgetechnologies &middot; Zonal Edge</p>
+            <p className="font-semibold text-[var(--text-primary)]">Zonal Edge</p>
             <p className="text-[10px] text-[var(--text-muted)]">4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 text-xs">

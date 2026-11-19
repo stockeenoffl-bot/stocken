@@ -799,7 +799,7 @@ export default function Landing() {
                 Market analysis and educational platform designed to help traders understand market structure and key price zones in the Indian stock market (Nifty and Sensex).
               </p>
               <div className="pt-1 text-[11px] text-[var(--text-muted)] space-y-1">
-                <p><strong>Trade Name:</strong> Vedgetechnologies</p>
+                <p><strong>Trade Name:</strong> Zonal Edge</p>
                 <p><strong>Legal Name:</strong> Viknesh</p>
                 <p><strong>Registered Address:</strong> 4, Muslim Kallaray Street, Nethaji Nagar II, Uppalam, Puducherry – 605001, India</p>
                 <p><strong>Business Email:</strong> support@zonaledge.com</p>
@@ -867,13 +867,13 @@ export default function Landing() {
             <div>
               <h4 className="text-xs font-semibold mb-3 text-[var(--text-primary)]">Statutory Disclaimer</h4>
               <p className="text-[10px] leading-relaxed text-[var(--text-muted)]">
-                Zonal Edge is operated by Vedgetechnologies. Intended for informational and educational purposes only. The platform does not guarantee profits or specific trading outcomes. Users are responsible for their own trading decisions and should understand market risks.
+                This website is operated by Zonal Edge. Intended for informational and educational purposes only. The platform does not guarantee profits or specific trading outcomes. Users are responsible for their own trading decisions and should understand market risks.
               </p>
             </div>
           </div>
 
           <div className="border-t pt-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-[11px] text-[var(--text-muted)]" style={{ borderColor: 'var(--border-subtle)' }}>
-            <p>© 2026 Vedgetechnologies (Zonal Edge). All rights reserved.</p>
+            <p>© 2026 Zonal Edge. All rights reserved.</p>
             <p>https://www.zonaledge.com &middot; Puducherry, India</p>
           </div>
         </div>
