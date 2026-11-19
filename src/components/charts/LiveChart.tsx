@@ -94,7 +94,9 @@ interface LiveChartProps {
   defaultRange?: RangeKey
   height?: number
   bullishZone?: ZoneDefinition
+  bullishZones?: ZoneDefinition[]
   bearishZone?: ZoneDefinition
+  bearishZones?: ZoneDefinition[]
   liquidityZone?: ZoneDefinition
   invalidationLevel?: number | string
   drawings?: ChartDrawing[]
@@ -114,7 +116,9 @@ export default function LiveChart({
   defaultRange = '1W',
   height = 520,
   bullishZone,
+  bullishZones,
   bearishZone,
+  bearishZones,
   liquidityZone,
   invalidationLevel,
   drawings = [],
@@ -544,11 +548,46 @@ export default function LiveChart({
     return Number.isFinite(n) && n > 0 ? n : null
   }, [invalidationLevel])
 
-  const zones: Array<{ z: ZoneDefinition | undefined; color: string; label: string }> = [
-    { z: bearishZone, color: '#EF4444', label: 'Bearish zone' },
-    { z: bullishZone, color: '#22C55E', label: 'Bullish zone' },
-    { z: liquidityZone, color: '#A855F7', label: 'Liquidity zone' },
-  ]
+  const zones: Array<{ z: ZoneDefinition | undefined; color: string; label: string }> = useMemo(() => {
+    const list: Array<{ z: ZoneDefinition | undefined; color: string; label: string }> = []
+    
+    // Bullish zones (supports up to 3 or any array)
+    const bZones: ZoneDefinition[] = []
+    if (bullishZones && bullishZones.length > 0) {
+      bZones.push(...bullishZones.filter(validZone))
+    } else if (validZone(bullishZone)) {
+      bZones.push(bullishZone!)
+    }
+    bZones.forEach((z, i) => {
+      list.push({
+        z,
+        color: '#22C55E',
+        label: bZones.length > 1 ? `Bullish Zone ${i + 1}` : 'Bullish zone',
+      })
+    })
+
+    // Bearish zones (supports up to 3 or any array)
+    const beZones: ZoneDefinition[] = []
+    if (bearishZones && bearishZones.length > 0) {
+      beZones.push(...bearishZones.filter(validZone))
+    } else if (validZone(bearishZone)) {
+      beZones.push(bearishZone!)
+    }
+    beZones.forEach((z, i) => {
+      list.push({
+        z,
+        color: '#EF4444',
+        label: beZones.length > 1 ? `Bearish Zone ${i + 1}` : 'Bearish zone',
+      })
+    })
+
+    // Liquidity zone
+    if (validZone(liquidityZone)) {
+      list.push({ z: liquidityZone, color: '#A855F7', label: 'Liquidity zone' })
+    }
+
+    return list
+  }, [bullishZone, bullishZones, bearishZone, bearishZones, liquidityZone])
 
   const toolBtn = (t: Tool, icon: React.ReactNode, title: string) => (
     <button

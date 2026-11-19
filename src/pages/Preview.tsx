@@ -120,7 +120,17 @@ export default function Preview() {
                   symbol={market}
                   height={viewMode === 'mobile' ? 420 : 500}
                   bullishZone={analysis.bullishZone}
+                  bullishZones={[
+                    analysis.bullishZone,
+                    analysis.bullishZone2 || { from: 0, to: 0 },
+                    analysis.bullishZone3 || { from: 0, to: 0 },
+                  ]}
                   bearishZone={analysis.bearishZone}
+                  bearishZones={[
+                    analysis.bearishZone,
+                    analysis.bearishZone2 || { from: 0, to: 0 },
+                    analysis.bearishZone3 || { from: 0, to: 0 },
+                  ]}
                   liquidityZone={analysis.liquidityZone}
                   invalidationLevel={analysis.invalidationLevel}
                 />
@@ -131,41 +141,63 @@ export default function Preview() {
             <div className={`grid gap-4 ${viewMode === 'mobile' ? 'grid-cols-1' : 'grid-cols-2'}`}>
               {/* Left Column: Zones */}
               <div className="rounded-lg border border-[var(--border-subtle)] p-4 bg-[var(--bg-secondary)] space-y-4">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Key Levels & Zones</h3>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Key Levels &amp; Zones</h3>
                 
                 <div className="space-y-3">
-                  {/* Bullish Zone */}
-                  <div className="p-3 rounded-md bg-emerald-500/5 border border-emerald-500/10">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">Bullish Zone</span>
-                      <ArrowUpRight size={14} className="text-emerald-400" />
-                    </div>
-                    <p className="text-sm font-mono font-bold text-[var(--text-primary)]">
-                      {analysis.bullishZone.from.toLocaleString()} – {analysis.bullishZone.to.toLocaleString()}
-                    </p>
-                  </div>
+                  {/* Bullish Zones */}
+                  {[
+                    analysis.bullishZone,
+                    analysis.bullishZone2 || { from: 0, to: 0 },
+                    analysis.bullishZone3 || { from: 0, to: 0 },
+                  ]
+                    .filter((z) => z && z.from > 0 && z.to > 0)
+                    .map((z, idx) => (
+                      <div key={`pb_${idx}`} className="p-3 rounded-md bg-emerald-500/5 border border-emerald-500/10">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide">
+                            Bullish Zone {idx + 1}
+                          </span>
+                          <ArrowUpRight size={14} className="text-emerald-400" />
+                        </div>
+                        <p className="text-sm font-mono font-bold text-[var(--text-primary)]">
+                          {z.from.toLocaleString()} – {z.to.toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
 
-                  {/* Bearish Zone */}
-                  <div className="p-3 rounded-md bg-rose-500/5 border border-rose-500/10">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wide">Bearish Zone</span>
-                      <ArrowUpRight size={14} className="text-rose-400 rotate-90" />
-                    </div>
-                    <p className="text-sm font-mono font-bold text-[var(--text-primary)]">
-                      {analysis.bearishZone.from.toLocaleString()} – {analysis.bearishZone.to.toLocaleString()}
-                    </p>
-                  </div>
+                  {/* Bearish Zones */}
+                  {[
+                    analysis.bearishZone,
+                    analysis.bearishZone2 || { from: 0, to: 0 },
+                    analysis.bearishZone3 || { from: 0, to: 0 },
+                  ]
+                    .filter((z) => z && z.from > 0 && z.to > 0)
+                    .map((z, idx) => (
+                      <div key={`pbe_${idx}`} className="p-3 rounded-md bg-rose-500/5 border border-rose-500/10">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-bold text-rose-400 uppercase tracking-wide">
+                            Bearish Zone {idx + 1}
+                          </span>
+                          <ArrowUpRight size={14} className="text-rose-400 rotate-90" />
+                        </div>
+                        <p className="text-sm font-mono font-bold text-[var(--text-primary)]">
+                          {z.from.toLocaleString()} – {z.to.toLocaleString()}
+                        </p>
+                      </div>
+                    ))}
 
                   {/* Liquidity Zone */}
-                  <div className="p-3 rounded-md bg-purple-500/5 border border-purple-500/10">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Liquidity Zone</span>
-                      <ArrowUpRight size={14} className="text-purple-400 rotate-45" />
+                  {analysis.liquidityZone && analysis.liquidityZone.from > 0 && analysis.liquidityZone.to > 0 && (
+                    <div className="p-3 rounded-md bg-purple-500/5 border border-purple-500/10">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wide">Liquidity Zone</span>
+                        <ArrowUpRight size={14} className="text-purple-400 rotate-45" />
+                      </div>
+                      <p className="text-sm font-mono font-bold text-[var(--text-primary)]">
+                        {analysis.liquidityZone.from.toLocaleString()} – {analysis.liquidityZone.to.toLocaleString()}
+                      </p>
                     </div>
-                    <p className="text-sm font-mono font-bold text-[var(--text-primary)]">
-                      {analysis.liquidityZone.from.toLocaleString()} – {analysis.liquidityZone.to.toLocaleString()}
-                    </p>
-                  </div>
+                  )}
                 </div>
               </div>
 

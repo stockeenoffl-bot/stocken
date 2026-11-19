@@ -16,7 +16,13 @@ export interface LiveMarketData {
   supportZone: { from: number; to: number }
   resistanceZone: { from: number; to: number }
   bullishZone?: { from: number; to: number }
+  bullishZone2?: { from: number; to: number }
+  bullishZone3?: { from: number; to: number }
+  bullishZones?: Array<{ from: number; to: number }>
   bearishZone?: { from: number; to: number }
+  bearishZone2?: { from: number; to: number }
+  bearishZone3?: { from: number; to: number }
+  bearishZones?: Array<{ from: number; to: number }>
   liquidityZone?: { from: number; to: number }
   biasStatement?: string
   sessions?: {

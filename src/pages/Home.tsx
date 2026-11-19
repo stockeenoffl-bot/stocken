@@ -202,7 +202,21 @@ export default function Home() {
           defaultTimeframe={liveData.chartTimeframe || '15m'}
           defaultRange={liveData.chartRange || '1W'}
           bullishZone={published ? liveData.bullishZone || liveData.supportZone : undefined}
+          bullishZones={
+            published
+              ? liveData.bullishZones && liveData.bullishZones.length > 0
+                ? liveData.bullishZones
+                : ([liveData.bullishZone || liveData.supportZone, liveData.bullishZone2, liveData.bullishZone3].filter(Boolean) as any)
+              : undefined
+          }
           bearishZone={published ? liveData.bearishZone || liveData.resistanceZone : undefined}
+          bearishZones={
+            published
+              ? liveData.bearishZones && liveData.bearishZones.length > 0
+                ? liveData.bearishZones
+                : ([liveData.bearishZone || liveData.resistanceZone, liveData.bearishZone2, liveData.bearishZone3].filter(Boolean) as any)
+              : undefined
+          }
           liquidityZone={published ? liveData.liquidityZone : undefined}
           invalidationLevel={published ? liveData.invalidationLevel : undefined}
           drawings={published ? liveData.drawings || [] : []}
@@ -252,19 +266,42 @@ export default function Home() {
               </span>
             </div>
             
-            <div className="space-y-3 pt-1">
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
-                <span className="text-emerald-400 font-bold">Support / Bullish Zone</span>
-                <span className="font-mono font-bold text-[var(--text-primary)]">
-                  {liveData.bullishZone?.from || liveData.supportZone?.from || '-'} – {liveData.bullishZone?.to || liveData.supportZone?.to || '-'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
-                <span className="text-rose-400 font-bold">Resistance / Bearish Zone</span>
-                <span className="font-mono font-bold text-[var(--text-primary)]">
-                  {liveData.bearishZone?.from || liveData.resistanceZone?.from || '-'} – {liveData.bearishZone?.to || liveData.resistanceZone?.to || '-'}
-                </span>
-              </div>
+            <div className="space-y-2.5 pt-1">
+              {(() => {
+                const bZones = (liveData.bullishZones && liveData.bullishZones.length > 0
+                  ? liveData.bullishZones
+                  : [liveData.bullishZone || liveData.supportZone, liveData.bullishZone2, liveData.bullishZone3]
+                ).filter((z) => z && z.from > 0 && z.to > 0)
+                const beZones = (liveData.bearishZones && liveData.bearishZones.length > 0
+                  ? liveData.bearishZones
+                  : [liveData.bearishZone || liveData.resistanceZone, liveData.bearishZone2, liveData.bearishZone3]
+                ).filter((z) => z && z.from > 0 && z.to > 0)
+
+                return (
+                  <>
+                    {bZones.map((z, idx) => (
+                      <div key={`hb_${idx}`} className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
+                        <span className="text-emerald-400 font-bold">
+                          {bZones.length > 1 ? `Support / Bullish Zone ${idx + 1}` : 'Support / Bullish Zone'}
+                        </span>
+                        <span className="font-mono font-bold text-[var(--text-primary)]">
+                          {z.from} – {z.to}
+                        </span>
+                      </div>
+                    ))}
+                    {beZones.map((z, idx) => (
+                      <div key={`hbe_${idx}`} className="flex justify-between items-center text-xs pb-2 border-b border-[var(--border-subtle)]">
+                        <span className="text-rose-400 font-bold">
+                          {beZones.length > 1 ? `Resistance / Bearish Zone ${idx + 1}` : 'Resistance / Bearish Zone'}
+                        </span>
+                        <span className="font-mono font-bold text-[var(--text-primary)]">
+                          {z.from} – {z.to}
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )
+              })()}
               <div className="flex justify-between items-center text-xs">
                 <span className="text-amber-400 font-bold">Invalidation Level</span>
                 <span className="font-mono font-bold text-[var(--text-primary)]">

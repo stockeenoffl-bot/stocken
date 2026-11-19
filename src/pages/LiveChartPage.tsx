@@ -47,7 +47,17 @@ export default function LiveChartPage() {
         defaultTimeframe={data.chartTimeframe || '15m'}
         defaultRange={data.chartRange || '1W'}
         bullishZone={data.bullishZone || data.supportZone}
+        bullishZones={
+          data.bullishZones && data.bullishZones.length > 0
+            ? data.bullishZones
+            : ([data.bullishZone || data.supportZone, data.bullishZone2, data.bullishZone3].filter(Boolean) as any)
+        }
         bearishZone={data.bearishZone || data.resistanceZone}
+        bearishZones={
+          data.bearishZones && data.bearishZones.length > 0
+            ? data.bearishZones
+            : ([data.bearishZone || data.resistanceZone, data.bearishZone2, data.bearishZone3].filter(Boolean) as any)
+        }
         liquidityZone={data.liquidityZone}
         invalidationLevel={data.invalidationLevel}
         drawings={data.drawings || []}

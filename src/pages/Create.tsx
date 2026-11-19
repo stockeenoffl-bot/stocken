@@ -85,14 +85,22 @@ export default function Create() {
   const PRESETS: Record<string, Partial<typeof analysis>> = {
     'NIFTY 50': {
       bullishZone: { from: 24050, to: 24150 },
+      bullishZone2: { from: 0, to: 0 },
+      bullishZone3: { from: 0, to: 0 },
       bearishZone: { from: 24420, to: 24520 },
+      bearishZone2: { from: 0, to: 0 },
+      bearishZone3: { from: 0, to: 0 },
       liquidityZone: { from: 24200, to: 24280 },
       biasStatement: 'Bullish above 24,220',
       invalidationLevel: 24100,
     },
     SENSEX: {
       bullishZone: { from: 79050, to: 79200 },
+      bullishZone2: { from: 0, to: 0 },
+      bullishZone3: { from: 0, to: 0 },
       bearishZone: { from: 79650, to: 79800 },
+      bearishZone2: { from: 0, to: 0 },
+      bearishZone3: { from: 0, to: 0 },
       liquidityZone: { from: 79350, to: 79500 },
       biasStatement: 'Bullish above 79,250',
       invalidationLevel: 78950,
@@ -106,8 +114,12 @@ export default function Create() {
       const cap = (b: string) => (b.charAt(0).toUpperCase() + b.slice(1)) as 'Bullish' | 'Bearish' | 'Neutral'
       setAnalysis({
         ...analysis,
-        bullishZone: live.bullishZone || live.supportZone,
-        bearishZone: live.bearishZone || live.resistanceZone,
+        bullishZone: live.bullishZone || (live.bullishZones?.[0]) || live.supportZone || { from: 0, to: 0 },
+        bullishZone2: live.bullishZone2 || (live.bullishZones?.[1]) || { from: 0, to: 0 },
+        bullishZone3: live.bullishZone3 || (live.bullishZones?.[2]) || { from: 0, to: 0 },
+        bearishZone: live.bearishZone || (live.bearishZones?.[0]) || live.resistanceZone || { from: 0, to: 0 },
+        bearishZone2: live.bearishZone2 || (live.bearishZones?.[1]) || { from: 0, to: 0 },
+        bearishZone3: live.bearishZone3 || (live.bearishZones?.[2]) || { from: 0, to: 0 },
         liquidityZone: live.liquidityZone || { from: 0, to: 0 },
         overallBias: cap(live.bias),
         biasStatement: live.biasStatement || '',
@@ -151,7 +163,11 @@ export default function Create() {
     if (window.confirm('Are you sure you want to reset all analysis fields to empty?')) {
       setAnalysis({
         bullishZone: { from: 0, to: 0 },
+        bullishZone2: { from: 0, to: 0 },
+        bullishZone3: { from: 0, to: 0 },
         bearishZone: { from: 0, to: 0 },
+        bearishZone2: { from: 0, to: 0 },
+        bearishZone3: { from: 0, to: 0 },
         liquidityZone: { from: 0, to: 0 },
         overallBias: 'Neutral',
         biasStatement: '',
@@ -170,6 +186,20 @@ export default function Create() {
     const formattedTimestamp = getISTFormattedTime()
 
     try {
+      const allBullish = [
+        analysis.bullishZone,
+        analysis.bullishZone2 || { from: 0, to: 0 },
+        analysis.bullishZone3 || { from: 0, to: 0 },
+      ]
+      const validBullish = allBullish.filter((z) => z && z.from > 0 && z.to > 0)
+
+      const allBearish = [
+        analysis.bearishZone,
+        analysis.bearishZone2 || { from: 0, to: 0 },
+        analysis.bearishZone3 || { from: 0, to: 0 },
+      ]
+      const validBearish = allBearish.filter((z) => z && z.from > 0 && z.to > 0)
+
       // 1. PUBLISH: write to the shared database; Supabase Realtime pushes it to every user instantly.
       //    Drafts are never shown to users.
       if (status === 'published') {
@@ -182,8 +212,14 @@ export default function Create() {
             invalidationLevel: Number(analysis.invalidationLevel) || analysis.invalidationLevel,
             supportZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
             resistanceZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
-            bullishZone: { from: analysis.bullishZone.from, to: analysis.bullishZone.to },
-            bearishZone: { from: analysis.bearishZone.from, to: analysis.bearishZone.to },
+            bullishZone: analysis.bullishZone,
+            bullishZone2: analysis.bullishZone2,
+            bullishZone3: analysis.bullishZone3,
+            bullishZones: validBullish,
+            bearishZone: analysis.bearishZone,
+            bearishZone2: analysis.bearishZone2,
+            bearishZone3: analysis.bearishZone3,
+            bearishZones: validBearish,
             liquidityZone: analysis.liquidityZone,
             sessions: analysis.sessions,
             notes: analysis.notes,
@@ -218,18 +254,20 @@ export default function Create() {
           }
 
           const zones = [
-            {
+            ...validBullish.map((z, idx) => ({
               zone_type: 'support' as const,
               direction: 'bullish' as const,
-              price_from: analysis.bullishZone.from,
-              price_to: analysis.bullishZone.to,
-            },
-            {
+              price_from: z.from,
+              price_to: z.to,
+              label: `Bullish Zone ${idx + 1}`,
+            })),
+            ...validBearish.map((z, idx) => ({
               zone_type: 'resistance' as const,
               direction: 'bearish' as const,
-              price_from: analysis.bearishZone.from,
-              price_to: analysis.bearishZone.to,
-            },
+              price_from: z.from,
+              price_to: z.to,
+              label: `Bearish Zone ${idx + 1}`,
+            })),
           ]
 
           await analysisService.createAnalysis(payload, zones)
@@ -401,7 +439,17 @@ export default function Create() {
           defaultTimeframe={chartView.timeframe}
           defaultRange={chartView.range}
           bullishZone={analysis.bullishZone}
+          bullishZones={[
+            analysis.bullishZone,
+            analysis.bullishZone2 || { from: 0, to: 0 },
+            analysis.bullishZone3 || { from: 0, to: 0 },
+          ]}
           bearishZone={analysis.bearishZone}
+          bearishZones={[
+            analysis.bearishZone,
+            analysis.bearishZone2 || { from: 0, to: 0 },
+            analysis.bearishZone3 || { from: 0, to: 0 },
+          ]}
           liquidityZone={analysis.liquidityZone}
           invalidationLevel={analysis.invalidationLevel}
           drawings={customDrawings}
@@ -421,106 +469,322 @@ export default function Create() {
           variants={item}
           className="rounded-xl border border-[#1A2234] bg-[#0D121F] p-4 shadow-sm space-y-4"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-              3
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
+                3
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white tracking-wide">Key Zones</h3>
+                <p className="text-[11px] text-slate-400">Total 3 Bullish &amp; 3 Bearish Zones</p>
+              </div>
             </div>
-            <h3 className="text-sm font-bold text-white tracking-wide">Zones</h3>
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-300 border border-indigo-500/20">
+              3 + 3 Zones
+            </span>
           </div>
 
-          {/* Bullish Zone */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-emerald-400 block">
-              Bullish Zone
-            </label>
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
-                  From
-                </span>
-                <input
-                  type="number"
-                  value={analysis.bullishZone.from || ''}
-                  onChange={(e) =>
-                    setAnalysis({
-                      ...analysis,
-                      bullishZone: { ...analysis.bullishZone, from: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-indigo-500 transition-colors"
-                />
-              </div>
+          {/* Bullish Zones Group */}
+          <div className="space-y-3 pt-1">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-1">
+              <span className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                Bullish Zones (Support)
+              </span>
+              <span className="text-[10px] text-slate-400">3 Zones Available</span>
+            </div>
 
-              <div className="flex-1">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
-                  To
-                </span>
-                <input
-                  type="number"
-                  value={analysis.bullishZone.to || ''}
-                  onChange={(e) =>
-                    setAnalysis({
-                      ...analysis,
-                      bullishZone: { ...analysis.bullishZone, to: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-indigo-500 transition-colors"
-                />
+            {/* Bullish Zone 1 */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-emerald-300">
+                Bullish Zone 1 (Primary)
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    From
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bullishZone.from || ''}
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bullishZone: { ...analysis.bullishZone, from: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    To
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bullishZone.to || ''}
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bullishZone: { ...analysis.bullishZone, to: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="pt-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#14532D] border border-emerald-500 flex items-center justify-center shadow-sm">
+                    <div className="w-3 h-3 rounded-sm bg-emerald-400" />
+                  </div>
+                </div>
               </div>
+            </div>
 
-              {/* Color swatch matching screenshot */}
-              <div className="pt-4">
-                <div className="w-9 h-9 rounded-lg bg-[#14532D] border border-emerald-500 flex items-center justify-center cursor-pointer shadow-sm">
-                  <div className="w-3.5 h-3.5 rounded-sm bg-emerald-400" />
+            {/* Bullish Zone 2 */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-emerald-400/90">
+                Bullish Zone 2
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    From
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bullishZone2?.from || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bullishZone2: { from: Number(e.target.value), to: analysis.bullishZone2?.to || 0 },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    To
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bullishZone2?.to || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bullishZone2: { from: analysis.bullishZone2?.from || 0, to: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="pt-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#14532D]/70 border border-emerald-500/70 flex items-center justify-center shadow-sm">
+                    <div className="w-3 h-3 rounded-sm bg-emerald-400/80" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bullish Zone 3 */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-emerald-400/80">
+                Bullish Zone 3
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    From
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bullishZone3?.from || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bullishZone3: { from: Number(e.target.value), to: analysis.bullishZone3?.to || 0 },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    To
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bullishZone3?.to || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bullishZone3: { from: analysis.bullishZone3?.from || 0, to: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-emerald-500 transition-colors"
+                  />
+                </div>
+                <div className="pt-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#14532D]/50 border border-emerald-500/50 flex items-center justify-center shadow-sm">
+                    <div className="w-3 h-3 rounded-sm bg-emerald-400/60" />
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bearish Zone */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-rose-400 block">
-              Bearish Zone
-            </label>
-            <div className="flex items-center gap-3">
-              <div className="flex-1">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
-                  From
-                </span>
-                <input
-                  type="number"
-                  value={analysis.bearishZone.from || ''}
-                  onChange={(e) =>
-                    setAnalysis({
-                      ...analysis,
-                      bearishZone: { ...analysis.bearishZone, from: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-indigo-500 transition-colors"
-                />
-              </div>
+          {/* Bearish Zones Group */}
+          <div className="space-y-3 pt-3 border-t border-[#1E293B]">
+            <div className="flex items-center justify-between border-b border-[#1E293B] pb-1">
+              <span className="text-xs font-bold text-rose-400 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400" />
+                Bearish Zones (Resistance)
+              </span>
+              <span className="text-[10px] text-slate-400">3 Zones Available</span>
+            </div>
 
-              <div className="flex-1">
-                <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
-                  To
-                </span>
-                <input
-                  type="number"
-                  value={analysis.bearishZone.to || ''}
-                  onChange={(e) =>
-                    setAnalysis({
-                      ...analysis,
-                      bearishZone: { ...analysis.bearishZone, to: Number(e.target.value) },
-                    })
-                  }
-                  className="w-full px-3 py-2 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-indigo-500 transition-colors"
-                />
+            {/* Bearish Zone 1 */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-rose-300">
+                Bearish Zone 1 (Primary)
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    From
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bearishZone.from || ''}
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bearishZone: { ...analysis.bearishZone, from: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    To
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bearishZone.to || ''}
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bearishZone: { ...analysis.bearishZone, to: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+                <div className="pt-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#7F1D1D] border border-rose-500 flex items-center justify-center shadow-sm">
+                    <div className="w-3 h-3 rounded-sm bg-rose-400" />
+                  </div>
+                </div>
               </div>
+            </div>
 
-              {/* Color swatch matching screenshot */}
-              <div className="pt-4">
-                <div className="w-9 h-9 rounded-lg bg-[#7F1D1D] border border-rose-500 flex items-center justify-center cursor-pointer shadow-sm">
-                  <div className="w-3.5 h-3.5 rounded-sm bg-rose-400" />
+            {/* Bearish Zone 2 */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-rose-400/90">
+                Bearish Zone 2
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    From
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bearishZone2?.from || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bearishZone2: { from: Number(e.target.value), to: analysis.bearishZone2?.to || 0 },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    To
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bearishZone2?.to || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bearishZone2: { from: analysis.bearishZone2?.from || 0, to: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+                <div className="pt-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#7F1D1D]/70 border border-rose-500/70 flex items-center justify-center shadow-sm">
+                    <div className="w-3 h-3 rounded-sm bg-rose-400/80" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Bearish Zone 3 */}
+            <div className="space-y-1">
+              <label className="text-[11px] font-semibold text-rose-400/80">
+                Bearish Zone 3
+              </label>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    From
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bearishZone3?.from || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bearishZone3: { from: Number(e.target.value), to: analysis.bearishZone3?.to || 0 },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+                <div className="flex-1">
+                  <span className="text-[10px] uppercase font-semibold text-slate-400 block mb-1">
+                    To
+                  </span>
+                  <input
+                    type="number"
+                    value={analysis.bearishZone3?.to || ''}
+                    placeholder="0"
+                    onChange={(e) =>
+                      setAnalysis({
+                        ...analysis,
+                        bearishZone3: { from: analysis.bearishZone3?.from || 0, to: Number(e.target.value) },
+                      })
+                    }
+                    className="w-full px-3 py-1.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-sm font-mono text-white outline-none focus:border-rose-500 transition-colors"
+                  />
+                </div>
+                <div className="pt-4">
+                  <div className="w-8 h-8 rounded-lg bg-[#7F1D1D]/50 border border-rose-500/50 flex items-center justify-center shadow-sm">
+                    <div className="w-3 h-3 rounded-sm bg-rose-400/60" />
+                  </div>
                 </div>
               </div>
             </div>
@@ -585,7 +849,7 @@ export default function Create() {
             className="flex items-center gap-1.5 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition-colors pt-1"
           >
             <Plus size={14} />
-            <span>{showAdditionalZone ? 'Hide Additional Zone' : '+ Add Additional Zone (Optional)'}</span>
+            <span>{showAdditionalZone ? 'Hide Additional Zone' : '+ Add Additional Liquidity Zone (Optional)'}</span>
           </button>
         </motion.div>
 

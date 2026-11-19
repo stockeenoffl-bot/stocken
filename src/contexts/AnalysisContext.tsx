@@ -13,7 +13,11 @@ export interface SessionExpectation {
 
 export interface AnalysisData {
   bullishZone: Zone
+  bullishZone2?: Zone
+  bullishZone3?: Zone
   bearishZone: Zone
+  bearishZone2?: Zone
+  bearishZone3?: Zone
   liquidityZone: Zone
   overallBias: 'Bullish' | 'Bearish' | 'Neutral'
   biasStatement: string
@@ -29,7 +33,11 @@ interface AnalysisContextType {
 
 const defaultAnalysis: AnalysisData = {
   bullishZone: { from: 24050, to: 24150 },
+  bullishZone2: { from: 0, to: 0 },
+  bullishZone3: { from: 0, to: 0 },
   bearishZone: { from: 24420, to: 24520 },
+  bearishZone2: { from: 0, to: 0 },
+  bearishZone3: { from: 0, to: 0 },
   liquidityZone: { from: 24200, to: 24280 },
   overallBias: 'Bullish',
   biasStatement: 'Bullish above 24,220',

@@ -553,7 +553,17 @@ export default function Dashboard() {
                   defaultTimeframe={liveData.chartTimeframe || '15m'}
                   defaultRange={liveData.chartRange || '1W'}
                   bullishZone={liveData.bullishZone || liveData.supportZone}
+                  bullishZones={
+                    liveData.bullishZones && liveData.bullishZones.length > 0
+                      ? liveData.bullishZones
+                      : [liveData.bullishZone || liveData.supportZone, liveData.bullishZone2, liveData.bullishZone3].filter(Boolean) as any
+                  }
                   bearishZone={liveData.bearishZone || liveData.resistanceZone}
+                  bearishZones={
+                    liveData.bearishZones && liveData.bearishZones.length > 0
+                      ? liveData.bearishZones
+                      : [liveData.bearishZone || liveData.resistanceZone, liveData.bearishZone2, liveData.bearishZone3].filter(Boolean) as any
+                  }
                   liquidityZone={liveData.liquidityZone}
                   invalidationLevel={liveData.invalidationLevel}
                   drawings={liveData.drawings || []}
@@ -602,14 +612,33 @@ export default function Dashboard() {
                     <div>
                       <span className="text-[10px] uppercase font-bold" style={{ color: 'var(--text-muted)' }}>Key Levels to Watch</span>
                       <ul className="mt-1 space-y-1">
-                        <li className="text-xs flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
-                          <span>Support Zone:</span>
-                          <span className="font-mono font-bold text-emerald-400">{liveData.supportZone?.from} - {liveData.supportZone?.to}</span>
-                        </li>
-                        <li className="text-xs flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
-                          <span>Resistance Zone:</span>
-                          <span className="font-mono font-bold text-rose-400">{liveData.resistanceZone?.from} - {liveData.resistanceZone?.to}</span>
-                        </li>
+                        {(() => {
+                          const bZones = (liveData.bullishZones && liveData.bullishZones.length > 0
+                            ? liveData.bullishZones
+                            : [liveData.bullishZone || liveData.supportZone, liveData.bullishZone2, liveData.bullishZone3]
+                          ).filter((z) => z && z.from > 0 && z.to > 0)
+                          const beZones = (liveData.bearishZones && liveData.bearishZones.length > 0
+                            ? liveData.bearishZones
+                            : [liveData.bearishZone || liveData.resistanceZone, liveData.bearishZone2, liveData.bearishZone3]
+                          ).filter((z) => z && z.from > 0 && z.to > 0)
+
+                          return (
+                            <>
+                              {bZones.map((z, idx) => (
+                                <li key={`b_${idx}`} className="text-xs flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
+                                  <span>{bZones.length > 1 ? `Support / Bullish Zone ${idx + 1}:` : 'Support / Bullish Zone:'}</span>
+                                  <span className="font-mono font-bold text-emerald-400">{z.from} – {z.to}</span>
+                                </li>
+                              ))}
+                              {beZones.map((z, idx) => (
+                                <li key={`be_${idx}`} className="text-xs flex items-center justify-between" style={{ color: 'var(--text-secondary)' }}>
+                                  <span>{beZones.length > 1 ? `Resistance / Bearish Zone ${idx + 1}:` : 'Resistance / Bearish Zone:'}</span>
+                                  <span className="font-mono font-bold text-rose-400">{z.from} – {z.to}</span>
+                                </li>
+                              ))}
+                            </>
+                          )
+                        })()}
                       </ul>
                     </div>
                   </div>
