@@ -240,10 +240,9 @@ function generateIntradayOiRows(
   // Descending order so latest interval is at the top
   const rows = [...forwardRows].reverse()
 
-  // Blend live broker snapshots if available
+  // Blend live broker snapshots if available (strictly 5-minute intervals, ignoring 0-change noise)
   if (liveSnapshots.length >= 2) {
-    const liveDeltaRows: OiChangeRow[] = []
-    for (let i = liveSnapshots.length - 1; i > 0 && liveDeltaRows.length < 5; i--) {
+    for (let i = liveSnapshots.length - 1; i > 0; i--) {
       const cur = liveSnapshots[i]
       const prev = liveSnapshots[i - 1]
       const prevByStrike = new Map(prev.rows.map((r) => [r.strike, r]))
@@ -263,38 +262,42 @@ function generateIntradayOiRows(
         callOI += r.callOI
         putOI += r.putOI
       }
+
+      // Ignore zero-change snapshots so no 0-field rows are produced
+      if (changeCallOi === 0 && changePutOi === 0) continue
+
       const diffOi = changePutOi - changeCallOi
       const netPcr = callOI ? +(putOI / callOI).toFixed(2) : 1
       const d = new Date(cur.ts)
-      const curDateStr = d.toLocaleDateString('en-GB', { timeZone: 'Asia/Kolkata' }).replace(/\//g, '-')
-      const curTimeStr = d.toLocaleTimeString('en-GB', { timeZone: 'Asia/Kolkata', hour12: false }).slice(0, 5)
 
-      let liveDhb: 'High Break' | 'Low Break' | null = null
-      if (quote) {
-        if (quote.high && quote.ltp >= quote.high * 0.9995) liveDhb = 'High Break'
-        else if (quote.low && quote.ltp <= quote.low * 1.0005) liveDhb = 'Low Break'
+      // Align strictly to 5-minute interval bucket
+      const utcM = d.getUTCHours() * 60 + d.getUTCMinutes()
+      const istM = (utcM + 330) % 1440
+      const alignedM = Math.floor(istM / intervalMins) * intervalMins
+      const hh = String(Math.floor(alignedM / 60)).padStart(2, '0')
+      const mm = String(alignedM % 60).padStart(2, '0')
+      const bucketTime = `${hh}:${mm}`
+
+      // Update the matching 5-minute interval row
+      const targetRow = rows.find((r) => r.time === bucketTime)
+      if (targetRow) {
+        targetRow.changeCallOi = changeCallOi
+        targetRow.changePutOi = changePutOi
+        targetRow.diffOi = diffOi
+        targetRow.netPcr = netPcr
+        targetRow.totalCallLtpChg = +totalCallLtpChg.toFixed(2)
+        targetRow.putLtpChg = +putLtpChg.toFixed(2)
+        targetRow.cepeLtpChg = +(totalCallLtpChg + putLtpChg).toFixed(2)
+        targetRow.totalPutLtp = +putOI.toFixed(2)
+        targetRow.directionChange = changeCallOi
+          ? Math.max(-350, Math.min(350, +((diffOi / Math.abs(changeCallOi)) * 100).toFixed(1)))
+          : (diffOi > 0 ? 100 : -100)
+        targetRow.sentiment = diffOi > 0 ? 'Bullish' : diffOi < 0 ? 'Bearish' : 'Neutral'
+        targetRow.dhbDiffOi = diffOi > 0
+          ? `+${new Intl.NumberFormat('en-IN').format(diffOi)}`
+          : new Intl.NumberFormat('en-IN').format(diffOi)
       }
-
-      liveDeltaRows.push({
-        date: curDateStr,
-        time: curTimeStr,
-        dhb: liveDhb,
-        changeCallOi,
-        changePutOi,
-        diffOi,
-        directionChange: changeCallOi ? Math.max(-350, Math.min(350, +((diffOi / Math.abs(changeCallOi)) * 100).toFixed(1))) : 0,
-        changeDirection: diffOi,
-        totalCallLtpChg: +totalCallLtpChg.toFixed(2),
-        cepeLtpChg: +(totalCallLtpChg + putLtpChg).toFixed(2),
-        putLtpChg: +putLtpChg.toFixed(2),
-        totalPutLtp: +putOI.toFixed(2),
-        netPcr,
-        dhbDiffOi: diffOi > 0 ? `+${new Intl.NumberFormat('en-IN').format(diffOi)}` : new Intl.NumberFormat('en-IN').format(diffOi),
-        sentiment: diffOi > 0 ? 'Bullish' : diffOi < 0 ? 'Bearish' : 'Neutral',
-      })
     }
-
-    return [...liveDeltaRows, ...rows.filter(r => !liveDeltaRows.some(l => l.time === r.time))]
   }
 
   return rows
@@ -399,12 +402,15 @@ export default function OI() {
       setLastUpdated(res.serverTime || Date.now())
       setChainError(null)
 
-      // Keep a rolling window of snapshots (one per ~minute) for the change table.
+      // Keep a rolling window of snapshots (one per 5 minutes) for the change table.
       const ts = res.serverTime || Date.now()
       const snaps = snapshotsRef.current
-      if (!snaps.length || ts - snaps[snaps.length - 1].ts >= 55000) {
+      const intervalMins = interval === '15 min' ? 15 : interval === '30 min' ? 30 : 5
+      const snapshotIntervalMs = intervalMins * 60 * 1000 // 5 minutes once
+
+      if (!snaps.length || ts - snaps[snaps.length - 1].ts >= snapshotIntervalMs) {
         snaps.push({ ts, rows: res.rows })
-        if (snaps.length > 120) snaps.shift()
+        if (snaps.length > 60) snaps.shift()
         setSnapshotCount(snaps.length)
       }
       setRawOiData(
@@ -453,15 +459,17 @@ export default function OI() {
     }
   }, [analysisIndex, expiry])
 
-  // Live chain: load on mount / market change, then poll
+  // Live chain: load on mount / market / interval change, then poll strictly 5 minutes once
   useEffect(() => {
     void loadChain()
+    const intervalMins = interval === '15 min' ? 15 : interval === '30 min' ? 30 : 5
+    const pollIntervalMs = intervalMins * 60 * 1000 // 5 minutes once (300,000 ms)
     const id = setInterval(() => {
       if (document.hidden) return
       void loadChain({ silent: true })
-    }, isMarketOpenIST() ? 5000 : 60000)
+    }, pollIntervalMs)
     return () => clearInterval(id)
-  }, [loadChain])
+  }, [loadChain, interval])
 
   // Spot price and quotes subscription for Day H/L tracking
   useEffect(() => {
