@@ -14,6 +14,7 @@ import {
   Check,
 } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { useMarket } from '@/contexts/MarketContext'
 import { marketDataService } from '@/services/marketDataService'
 import type { OIData, OptionChainRow, Candle } from '@/services/marketDataService'
 import { aliceBlueService } from '@/services/aliceBlueService'
@@ -318,11 +319,12 @@ function generateIntradayOiRows(
 }
 
 export default function OI() {
+  const { market: globalMarket, setMarket: setGlobalMarket } = useMarket()
   const [activeMainTab, setActiveMainTab] = useState<MainTab>('oiChange')
   
   // OI Change States
   const [mode, setMode] = useState<'live' | 'historical'>('live')
-  const [market, setMarket] = useState('NIFTY')
+  const [market, setMarket] = useState(() => (globalMarket === 'SENSEX' ? 'SENSEX' : 'NIFTY'))
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [interval, setIntervalValue] = useState('5 min')
   const [showGraph, setShowGraph] = useState(false)
@@ -330,10 +332,21 @@ export default function OI() {
   const [showStrikeModal, setShowStrikeModal] = useState(false)
 
   // OI Analysis States
-  const [analysisIndex, setAnalysisIndex] = useState<'NIFTY50' | 'SENSEX' | 'NIFTYBANK' | 'FINNIFTY'>('NIFTY50')
+  const [analysisIndex, setAnalysisIndex] = useState<'NIFTY50' | 'SENSEX' | 'NIFTYBANK' | 'FINNIFTY'>(() => (globalMarket === 'SENSEX' ? 'SENSEX' : 'NIFTY50'))
   const [activeOiSubTab, setActiveOiSubTab] = useState<OiSubTab>('oi')
   const [analysisMode, setAnalysisMode] = useState<'intraday' | 'historical'>('intraday')
   const [notesText, setNotesText] = useState('')
+
+  // Sync with global top bar toggle (NIFTY 50 / SENSEX)
+  useEffect(() => {
+    if (globalMarket === 'SENSEX' && market !== 'SENSEX') {
+      setMarket('SENSEX')
+      setAnalysisIndex('SENSEX')
+    } else if (globalMarket === 'NIFTY 50' && market !== 'NIFTY') {
+      setMarket('NIFTY')
+      setAnalysisIndex('NIFTY50')
+    }
+  }, [globalMarket])
 
   // Auth and Admin/Editor Edit Mode
   const { profile, hasEditorAccess } = useAuth()
@@ -379,17 +392,27 @@ export default function OI() {
     }).catch(() => {})
   }, [market, interval, clockTick])
 
-  // Sync market and analysisIndex
+  // Sync market and analysisIndex (and update top header toggle)
   const handleMarketChange = (newMarket: string) => {
     setMarket(newMarket)
     const newIdx = newMarket === 'NIFTY' ? 'NIFTY50' : newMarket === 'SENSEX' ? 'SENSEX' : newMarket === 'NIFTYBANK' ? 'NIFTYBANK' : 'FINNIFTY'
     setAnalysisIndex(newIdx)
+    if (newMarket === 'SENSEX') {
+      setGlobalMarket('SENSEX')
+    } else if (newMarket === 'NIFTY') {
+      setGlobalMarket('NIFTY 50')
+    }
   }
 
   const handleAnalysisIndexChange = (newIdx: 'NIFTY50' | 'SENSEX' | 'NIFTYBANK' | 'FINNIFTY') => {
     setAnalysisIndex(newIdx)
     const newMarket = newIdx === 'NIFTY50' ? 'NIFTY' : newIdx === 'SENSEX' ? 'SENSEX' : newIdx === 'NIFTYBANK' ? 'NIFTYBANK' : 'FINNIFTY'
     setMarket(newMarket)
+    if (newIdx === 'SENSEX') {
+      setGlobalMarket('SENSEX')
+    } else if (newIdx === 'NIFTY50') {
+      setGlobalMarket('NIFTY 50')
+    }
   }
 
   /**

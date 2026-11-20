@@ -240,10 +240,10 @@ function sessionUsable(s) {
 // ---------------------------------------------------------------------------
 // Alice Blue
 // ---------------------------------------------------------------------------
-// How the bearer token is formatted. Auto-detected on the first successful call,
-// so small doc differences don't break the feed.
-let authFormat = 0 // 0: "userId token", 1: "token", 2: "userId:token"
-let authFormatKnown = false
+// How the bearer token is formatted. Format 1 ("Bearer <userSession>") is the
+// official and only supported format for modern Alice Blue API v2.
+let authFormat = 1 // 1: "token", 0: "userId token", 2: "userId:token"
+let authFormatKnown = true
 function authHeader(s) {
   if (authFormat === 1) return `Bearer ${s.userSession}`
   if (authFormat === 2) return `Bearer ${s.userId}:${s.userSession}`
@@ -256,7 +256,7 @@ function authHeader(s) {
 let authBlocked = false // IP whitelist / permission problem
 
 async function alice(route, body, s) {
-  const formats = authFormatKnown ? [authFormat] : [0, 1, 2]
+  const formats = authFormatKnown ? [authFormat] : [1, 0, 2]
   let last = null
   let sawSessionError = false
   let sawAuthRejection = false
@@ -403,32 +403,53 @@ async function aliceHistory(inst, tf, range) {
 // ---------------------------------------------------------------------------
 // Quotes
 // ---------------------------------------------------------------------------
-async function aliceQuotes(list) {
-  const s = loadSession()
-  if (!sessionUsable(s) || !list.length) return []
+// ---------------------------------------------------------------------------
+// Centralized, Rate-Limited Live Quotes Engine (Alice Blue)
+// ---------------------------------------------------------------------------
+const quoteStore = new Map()
+let lastQuoteFetchTime = 0
+let inFlightQuotePromise = null
 
-  const fetchBatch = async (batch) => {
+async function fetchAllAliceQuotes() {
+  const s = loadSession()
+  if (!sessionUsable(s)) return
+
+  // Alice Blue enforces max 1 request/second per IP.
+  // We bundle ALL instruments into a single multi/ohlc request.
+  const unique = []
+  const seen = new Set()
+  for (const item of INSTRUMENTS) {
+    const key = `${item.exchange}:${item.token}`
+    if (!seen.has(key)) {
+      seen.add(key)
+      unique.push(item)
+    }
+  }
+
+  try {
     const res = await alice(
       '/open-api/od/ChartAPIService/chart/get/multi/ohlc',
-      batch.map((i) => ({ exchange: i.exchange, token: i.token })),
+      unique.map((i) => ({ exchange: i.exchange, token: i.token })),
       s
     )
     const rows = Array.isArray(res.json?.result) ? res.json.result : []
-    const out = []
     for (const r of rows) {
       const token = String(r.tk ?? r.token ?? '')
       const exch = String(r.e ?? r.exchange ?? '').toUpperCase()
-      // Match token AND exchange so a BSE index (SENSEX) is never confused with
-      // an NSE index that happens to share the same token number.
       const inst =
-        batch.find((i) => i.token === token && (!exch || i.exchange === exch)) ||
-        batch.find((i) => i.token === token)
+        unique.find((i) => i.token === token && (!exch || i.exchange === exch)) ||
+        unique.find((i) => i.token === token)
       if (!inst) continue
       const ltp = num(r.ltp ?? r.lp)
       if (!ltp) continue
-      const prevClose = num(r.pc ?? r.prevClose ?? r.close) || ltp
+      const openPrice = num(r.open ?? r.o)
+      // When previous close is missing or equal to ltp, calculate change relative to today's open price
+      let prevClose = num(r.pc ?? r.prevClose ?? r.pdc)
+      if (!prevClose || prevClose === ltp) {
+        prevClose = openPrice || ltp
+      }
       const change = +(ltp - prevClose).toFixed(2)
-      out.push({
+      const q = {
         symbol: inst.symbol,
         name: inst.name,
         exchange: inst.exchange,
@@ -436,41 +457,51 @@ async function aliceQuotes(list) {
         ltp,
         change,
         changePercent: prevClose ? +((change / prevClose) * 100).toFixed(2) : 0,
-        open: num(r.open ?? r.o) || ltp,
+        open: openPrice || ltp,
         high: num(r.high ?? r.h) || ltp,
         low: num(r.low ?? r.l) || ltp,
         prevClose,
         volume: num(r.volume ?? r.v),
         ts: Date.now(),
         source: 'aliceblue',
-      })
+      }
+      quoteStore.set(inst.symbol, q)
+      // Also cache aliases (e.g. NIFTY -> NIFTY 50)
+      for (const [alias, canonical] of Object.entries(ALIASES)) {
+        if (canonical === inst.symbol) quoteStore.set(alias, { ...q, symbol: alias })
+      }
     }
-    return out
+    lastQuoteFetchTime = Date.now()
+  } catch (err) {
+    console.error('[quotes-fetch-error]', err?.message || err)
   }
-
-  const quotes = await fetchBatch(list)
-  // BSE indices are sometimes dropped from a mixed batch. Retry the missing
-  // ones individually so SENSEX gets its OWN price, not another index's.
-  const missing = list.filter((i) => !quotes.some((q) => q.symbol === i.symbol))
-  for (const inst of missing) {
-    if (sessionInvalid) break
-    try {
-      quotes.push(...(await fetchBatch([inst])))
-    } catch { /* skip */ }
-  }
-  return quotes
 }
 
-function getQuotes(list) {
-  const key = 'q:' + list.map((i) => i.symbol).sort().join(',')
-  return cached(key, isMarketOpen() ? 900 : 15000, async () => {
-    try {
-      return await aliceQuotes(list)
-    } catch (e) {
-      console.error('[quotes]', e?.message || e)
-      return []
+async function getQuotes(list) {
+  const now = Date.now()
+  const minInterval = isMarketOpen() ? 1200 : 8000
+
+  // If cached quotes are fresh, return them instantly
+  const needRefresh = now - lastQuoteFetchTime >= minInterval
+  if (needRefresh) {
+    if (!inFlightQuotePromise) {
+      inFlightQuotePromise = fetchAllAliceQuotes().finally(() => {
+        inFlightQuotePromise = null
+      })
     }
-  })
+    await inFlightQuotePromise
+  }
+
+  const out = []
+  for (const item of list) {
+    const cached = quoteStore.get(item.symbol)
+    if (cached) {
+      out.push(cached)
+    } else {
+      out.push(getFallbackServerQuote(item))
+    }
+  }
+  return out
 }
 
 // ---------------------------------------------------------------------------
@@ -543,8 +574,34 @@ function optionMarket(raw) {
 async function aliceOptionPost(route, body) {
   const s = loadSession()
   if (!sessionUsable(s)) return null
-  const res = await alice(route, body, s)
-  return res.ok ? res.json : null
+  // Alice Blue /obrest/optionChain/* endpoints strictly require Bearer <userSession> (format 1: JWT)
+  const headers = [
+    `Bearer ${s.userSession}`,
+    `Bearer ${s.userId} ${s.userSession}`,
+    `Bearer ${s.userId}:${s.userSession}`,
+  ]
+  for (const h of headers) {
+    try {
+      const res = await fetch(ALICE_BASE + route, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': h,
+        },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        const text = await res.text()
+        try {
+          const json = JSON.parse(text)
+          if (json?.status === 'Ok' || Array.isArray(json?.result)) {
+            return json
+          }
+        } catch { /* not json */ }
+      }
+    } catch { /* network err */ }
+  }
+  return null
 }
 
 /** The chain payload does not always carry an explicit strike field, so fall
@@ -579,18 +636,20 @@ function parseOptionChain(json) {
       if (!ce && !pe) continue
       const strike = optionStrike(ce, pe)
       if (!(strike > 0)) continue
-      const callOI = num(ce?.oi)
-      const putOI = num(pe?.oi)
-      const callPrevOI = num(ce?.pdoi)
-      const putPrevOI = num(pe?.pdoi)
+      const callOI = num(ce?.oi ?? ce?.OI ?? ce?.openInterest ?? ce?.OpenInterest ?? ce?.netQty)
+      const putOI = num(pe?.oi ?? pe?.OI ?? pe?.openInterest ?? pe?.OpenInterest ?? pe?.netQty)
+      const callPrevOI = num(ce?.pdoi ?? ce?.PDOI ?? ce?.prevOI)
+      const putPrevOI = num(pe?.pdoi ?? pe?.PDOI ?? pe?.prevOI)
+      const callLtp = num(ce?.ltp ?? ce?.lp ?? ce?.lastPrice)
+      const putLtp = num(pe?.ltp ?? pe?.lp ?? pe?.lastPrice)
       rows.push({
         strike,
         callOI,
         putOI,
         callChange: callPrevOI ? callOI - callPrevOI : 0,
         putChange: putPrevOI ? putOI - putPrevOI : 0,
-        callLtp: num(ce?.ltp),
-        putLtp: num(pe?.ltp),
+        callLtp,
+        putLtp,
         callPrevOI,
         putPrevOI,
         callToken: String(ce?.token || ''),
@@ -692,7 +751,7 @@ function getBackupOptionChain(market, expiry) {
   }
 }
 
-async function getOptionChain(market, expiry, interval) {
+async function getOptionChain(market, expiry, interval = 25) {
   const m = optionMarket(market)
   if (!m) return null
   const expiries = await getOptionExpiries(market)
@@ -700,15 +759,22 @@ async function getOptionChain(market, expiry, interval) {
   if (!exp) return { underlying: m.underlying, exch: m.exch, expiry: null, expiries, rows: [] }
 
   const ttl = isMarketOpen() ? 4000 : 60000
-  const rows = await cached(`oc:${m.exch}:${m.underlying}:${exp}:${interval || 0}`, ttl, async () => {
-    const base = { underlying: m.underlying, expiry: exp, exch: m.exch }
-    // `interval` is documented as a strike-window hint; some deployments reject
-    // it, so retry without it before giving up.
-    const attempts = interval ? [{ ...base, interval }, base] : [base]
+  const reqInterval = Number(interval) || 25
+  const rows = await cached(`oc:${m.exch}:${m.underlying}:${exp}:${reqInterval}`, ttl, async () => {
+    // Alice Blue optionChain interval parameter controls strike window (25 -> 50 strikes)
+    const attempts = [
+      { underlying: m.underlying, expiry: exp, exch: m.exch, interval: reqInterval },
+      { underlying: m.underlying, expiry: exp, exch: m.exch, interval: 25 },
+      { underlying: m.underlying, expiry: exp, exch: m.exch, interval: 15 },
+      { underlying: m.underlying, expiry: exp, exch: m.exch, interval: 5 },
+    ]
     for (const body of attempts) {
       const json = await aliceOptionPost('/obrest/optionChain/getOptionChain', body)
       const parsed = parseOptionChain(json)
-      if (parsed.length) return parsed
+      if (parsed.length) {
+        const hasLiveOi = parsed.some(r => r.callOI > 0 || r.putOI > 0)
+        if (hasLiveOi) return parsed
+      }
     }
     return []
   })

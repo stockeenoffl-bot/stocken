@@ -497,6 +497,135 @@ export default function LiveChart({
   // ---------------------------------------------------------------- drawing (admin)
   const commit = (next: ChartDrawing[]) => onDrawingsChange?.(next)
 
+  const [dragState, setDragState] = useState<{
+    id: string
+    handle: string
+    startX: number
+    startY: number
+    origDrawing: ChartDrawing
+  } | null>(null)
+
+  const startDrag = (e: React.MouseEvent, d: ChartDrawing, handle: string) => {
+    if (!editable || tool !== 'cursor') return
+    e.stopPropagation()
+    e.preventDefault()
+    const { x, y } = pointFromEvent(e)
+    setDragState({
+      id: d.id,
+      handle,
+      startX: x,
+      startY: y,
+      origDrawing: { ...d },
+    })
+  }
+
+  useEffect(() => {
+    if (!dragState) return
+
+    const handleWindowMove = (e: MouseEvent) => {
+      if (!svgRef.current) return
+      const rect = svgRef.current.getBoundingClientRect()
+      const curX = e.clientX - rect.left
+      const curY = e.clientY - rect.top
+
+      const curData = toData(curX, curY)
+      const startData = toData(dragState.startX, dragState.startY)
+      if (!curData || !startData) return
+
+      const dTime = curData.time - startData.time
+      const dPrice = curData.price - startData.price
+      const orig = dragState.origDrawing
+
+      const updated = drawings.map((d) => {
+        if (d.id !== dragState.id) return d
+
+        if (dragState.handle === 'body' || dragState.handle === 'text') {
+          return {
+            ...d,
+            time1: orig.time1 + dTime,
+            price1: orig.price1 + dPrice,
+            time2: orig.time2 + dTime,
+            price2: orig.price2 + dPrice,
+          }
+        }
+        if (dragState.handle === 'hline') {
+          return {
+            ...d,
+            price1: orig.price1 + dPrice,
+            price2: orig.price2 + dPrice,
+          }
+        }
+        if (dragState.handle === 'p1') {
+          return {
+            ...d,
+            time1: orig.time1 + dTime,
+            price1: orig.price1 + dPrice,
+          }
+        }
+        if (dragState.handle === 'p2') {
+          return {
+            ...d,
+            time2: orig.time2 + dTime,
+            price2: orig.price2 + dPrice,
+          }
+        }
+        // Zone handles
+        if (d.type === 'zone') {
+          const isP1Higher = orig.price1 >= orig.price2
+          const isP1Earlier = orig.time1 <= orig.time2
+
+          let newTime1 = orig.time1
+          let newPrice1 = orig.price1
+          let newTime2 = orig.time2
+          let newPrice2 = orig.price2
+
+          // Price bounds
+          if (dragState.handle === 'top' || dragState.handle === 'nw' || dragState.handle === 'ne') {
+            if (isP1Higher) newPrice1 = orig.price1 + dPrice
+            else newPrice2 = orig.price2 + dPrice
+          }
+          if (dragState.handle === 'bottom' || dragState.handle === 'sw' || dragState.handle === 'se') {
+            if (isP1Higher) newPrice2 = orig.price2 + dPrice
+            else newPrice1 = orig.price1 + dPrice
+          }
+
+          // Time bounds
+          if (dragState.handle === 'left' || dragState.handle === 'nw' || dragState.handle === 'sw') {
+            if (isP1Earlier) newTime1 = orig.time1 + dTime
+            else newTime2 = orig.time2 + dTime
+          }
+          if (dragState.handle === 'right' || dragState.handle === 'ne' || dragState.handle === 'se') {
+            if (isP1Earlier) newTime2 = orig.time2 + dTime
+            else newTime1 = orig.time1 + dTime
+          }
+
+          return {
+            ...d,
+            time1: newTime1,
+            price1: newPrice1,
+            time2: newTime2,
+            price2: newPrice2,
+          }
+        }
+
+        return d
+      })
+
+      commit(updated)
+    }
+
+    const handleWindowUp = () => {
+      setDragState(null)
+    }
+
+    window.addEventListener('mousemove', handleWindowMove)
+    window.addEventListener('mouseup', handleWindowUp)
+    return () => {
+      window.removeEventListener('mousemove', handleWindowMove)
+      window.removeEventListener('mouseup', handleWindowUp)
+    }
+  }, [dragState, drawings])
+
   const onSvgDown = (e: React.MouseEvent<SVGSVGElement>) => {
     if (!editable || tool === 'cursor') return
     const { x, y } = pointFromEvent(e)
@@ -606,42 +735,130 @@ export default function LiveChart({
     const x2 = xFromUnix(d.time2)
     const y2 = yFromPrice(d.price2)
     const interactive = editable && !preview && tool === 'cursor'
-    const common = interactive
-      ? { style: { pointerEvents: 'stroke' as const, cursor: 'pointer' }, onDoubleClick: () => removeDrawing(d.id) }
-      : {}
+
     if (d.type === 'hline') {
       if (y1 === null) return null
       return (
         <g key={d.id}>
           <line x1={0} x2={plotWidth} y1={y1} y2={y1} stroke="#38BDF8" strokeWidth={1.5} strokeDasharray="6 4" />
-          <line x1={0} x2={plotWidth} y1={y1} y2={y1} stroke="transparent" strokeWidth={12} {...common}>
-            <title>{editable ? 'Double-click to delete' : `Level ${fmtPrice(d.price1)}`}</title>
+          <line
+            x1={0}
+            x2={plotWidth}
+            y1={y1}
+            y2={y1}
+            stroke="transparent"
+            strokeWidth={14}
+            style={interactive ? { pointerEvents: 'stroke', cursor: 'ns-resize' } : { pointerEvents: 'none' }}
+            onMouseDown={(e) => startDrag(e, d, 'hline')}
+            onDoubleClick={() => removeDrawing(d.id)}
+          >
+            <title>{editable ? 'Drag to move level · Double-click to delete' : `Level ${fmtPrice(d.price1)}`}</title>
           </line>
           <text x={6} y={y1 - 4} fill="#7DD3FC" fontSize={11} fontWeight={700}>{fmtPrice(d.price1)}</text>
         </g>
       )
     }
+
     if (d.type === 'text') {
       if (x1 === null || y1 === null) return null
       return (
-        <text key={d.id} x={x1} y={y1} fill="#E2E8F0" fontSize={12} fontWeight={700} stroke="#0A0D16" strokeWidth={3} paintOrder="stroke"
-          {...(interactive ? { style: { pointerEvents: 'all' as const, cursor: 'pointer' }, onDoubleClick: () => removeDrawing(d.id) } : {})}>
+        <text
+          key={d.id}
+          x={x1}
+          y={y1}
+          fill="#E2E8F0"
+          fontSize={12}
+          fontWeight={700}
+          stroke="#0A0D16"
+          strokeWidth={3}
+          paintOrder="stroke"
+          style={interactive ? { pointerEvents: 'all', cursor: 'move' } : { pointerEvents: 'none' }}
+          onMouseDown={(e) => startDrag(e, d, 'text')}
+          onDoubleClick={() => removeDrawing(d.id)}
+        >
           {d.text}
         </text>
       )
     }
+
     if (x1 === null || y1 === null || x2 === null || y2 === null) return null
+
     if (d.type === 'zone') {
+      const minX = Math.min(x1, x2)
+      const maxX = Math.max(x1, x2)
+      const minY = Math.min(y1, y2)
+      const maxY = Math.max(y1, y2)
+      const w = Math.max(4, maxX - minX)
+      const h = Math.max(4, maxY - minY)
+
       return (
-        <rect key={d.id} x={Math.min(x1, x2)} y={Math.min(y1, y2)} width={Math.abs(x2 - x1)} height={Math.abs(y2 - y1)}
-          fill="#3B82F6" fillOpacity={0.18} stroke="#3B82F6" strokeWidth={1.5}
-          {...(interactive ? { style: { pointerEvents: 'all' as const, cursor: 'pointer' }, onDoubleClick: () => removeDrawing(d.id) } : {})} />
+        <g key={d.id}>
+          {/* Main rectangle body */}
+          <rect
+            x={minX}
+            y={minY}
+            width={w}
+            height={h}
+            fill="#3B82F6"
+            fillOpacity={0.18}
+            stroke="#3B82F6"
+            strokeWidth={1.5}
+            style={interactive ? { pointerEvents: 'all', cursor: 'move' } : { pointerEvents: 'none' }}
+            onMouseDown={(e) => startDrag(e, d, 'body')}
+            onDoubleClick={() => removeDrawing(d.id)}
+          >
+            <title>{editable ? 'Drag to move zone · Double-click to delete' : 'Zone'}</title>
+          </rect>
+
+          {/* Interactive resize handles when admin cursor is active */}
+          {interactive && (
+            <>
+              {/* Corner handles */}
+              <circle cx={minX} cy={minY} r={5} fill="#3B82F6" stroke="#FFFFFF" strokeWidth={2} style={{ pointerEvents: 'all', cursor: 'nwse-resize' }} onMouseDown={(e) => startDrag(e, d, 'nw')} />
+              <circle cx={maxX} cy={minY} r={5} fill="#3B82F6" stroke="#FFFFFF" strokeWidth={2} style={{ pointerEvents: 'all', cursor: 'nesw-resize' }} onMouseDown={(e) => startDrag(e, d, 'ne')} />
+              <circle cx={minX} cy={maxY} r={5} fill="#3B82F6" stroke="#FFFFFF" strokeWidth={2} style={{ pointerEvents: 'all', cursor: 'nesw-resize' }} onMouseDown={(e) => startDrag(e, d, 'sw')} />
+              <circle cx={maxX} cy={maxY} r={5} fill="#3B82F6" stroke="#FFFFFF" strokeWidth={2} style={{ pointerEvents: 'all', cursor: 'nwse-resize' }} onMouseDown={(e) => startDrag(e, d, 'se')} />
+              {/* Edge handles */}
+              <circle cx={(minX + maxX) / 2} cy={minY} r={4} fill="#60A5FA" stroke="#FFFFFF" strokeWidth={1.5} style={{ pointerEvents: 'all', cursor: 'ns-resize' }} onMouseDown={(e) => startDrag(e, d, 'top')} />
+              <circle cx={(minX + maxX) / 2} cy={maxY} r={4} fill="#60A5FA" stroke="#FFFFFF" strokeWidth={1.5} style={{ pointerEvents: 'all', cursor: 'ns-resize' }} onMouseDown={(e) => startDrag(e, d, 'bottom')} />
+              <circle cx={minX} cy={(minY + maxY) / 2} r={4} fill="#60A5FA" stroke="#FFFFFF" strokeWidth={1.5} style={{ pointerEvents: 'all', cursor: 'ew-resize' }} onMouseDown={(e) => startDrag(e, d, 'left')} />
+              <circle cx={maxX} cy={(minY + maxY) / 2} r={4} fill="#60A5FA" stroke="#FFFFFF" strokeWidth={1.5} style={{ pointerEvents: 'all', cursor: 'ew-resize' }} onMouseDown={(e) => startDrag(e, d, 'right')} />
+            </>
+          )}
+        </g>
       )
     }
+
+    // Trendline (line)
     return (
       <g key={d.id}>
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#818CF8" strokeWidth={2} />
-        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="transparent" strokeWidth={12} {...common} />
+        <line x1={x1} y1={y1} x2={x2} y2={y2} stroke="#818CF8" strokeWidth={2.5} />
+        {/* Invisible wider stroke for easy body drag */}
+        <line
+          x1={x1}
+          y1={y1}
+          x2={x2}
+          y2={y2}
+          stroke="transparent"
+          strokeWidth={16}
+          style={interactive ? { pointerEvents: 'stroke', cursor: 'move' } : { pointerEvents: 'none' }}
+          onMouseDown={(e) => startDrag(e, d, 'body')}
+          onDoubleClick={() => removeDrawing(d.id)}
+        >
+          <title>{editable ? 'Drag line to move · Drag endpoints to resize · Double-click to delete' : 'Trendline'}</title>
+        </line>
+
+        {/* Endpoint drag handles */}
+        {interactive && (
+          <>
+            <circle cx={x1} cy={y1} r={5.5} fill="#818CF8" stroke="#FFFFFF" strokeWidth={2} style={{ pointerEvents: 'all', cursor: 'grab' }} onMouseDown={(e) => startDrag(e, d, 'p1')}>
+              <title>Drag endpoint 1</title>
+            </circle>
+            <circle cx={x2} cy={y2} r={5.5} fill="#818CF8" stroke="#FFFFFF" strokeWidth={2} style={{ pointerEvents: 'all', cursor: 'grab' }} onMouseDown={(e) => startDrag(e, d, 'p2')}>
+              <title>Drag endpoint 2</title>
+            </circle>
+          </>
+        )}
       </g>
     )
   }

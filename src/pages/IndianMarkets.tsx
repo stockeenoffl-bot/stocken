@@ -4,6 +4,7 @@ import { Clock, Radio } from 'lucide-react'
 import AliceBlueMiniChart from '@/components/charts/AliceBlueMiniChart'
 import QuotesBoard from '@/components/charts/QuotesBoard'
 import LiveChart from '@/components/charts/LiveChart'
+import { useMarket } from '@/contexts/MarketContext'
 import { isMarketOpenIST } from '@/lib/candles'
 
 const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
@@ -13,9 +14,26 @@ const INDICES = ['NIFTY 50', 'BANKNIFTY', 'FINNIFTY', 'SENSEX', 'INDIA VIX', 'MI
 const STOCKS = ['RELIANCE', 'HDFCBANK', 'ICICIBANK', 'TCS', 'INFY', 'SBIN', 'ITC', 'LT', 'AXISBANK', 'KOTAKBANK', 'BHARTIARTL', 'HINDUNILVR', 'MARUTI', 'BAJFINANCE', 'TATAMOTORS', 'SUNPHARMA', 'WIPRO', 'ADANIENT']
 
 export default function IndianMarkets() {
+  const { market: globalMarket, setMarket: setGlobalMarket } = useMarket()
   const [istTime, setIstTime] = useState('')
   const [open, setOpen] = useState(isMarketOpenIST())
-  const [symbol, setSymbol] = useState('NIFTY 50')
+  const [symbol, setSymbol] = useState(() => (globalMarket === 'SENSEX' ? 'SENSEX' : 'NIFTY 50'))
+
+  // Sync with top bar header toggle (NIFTY 50 / SENSEX)
+  useEffect(() => {
+    if (globalMarket && (globalMarket === 'NIFTY 50' || globalMarket === 'SENSEX') && symbol !== globalMarket) {
+      setSymbol(globalMarket)
+    }
+  }, [globalMarket])
+
+  const handleSelectSymbol = (newSymbol: string) => {
+    setSymbol(newSymbol)
+    if (newSymbol === 'SENSEX') {
+      setGlobalMarket('SENSEX')
+    } else if (newSymbol === 'NIFTY 50') {
+      setGlobalMarket('NIFTY 50')
+    }
+  }
 
   useEffect(() => {
     const tick = () => {
@@ -56,13 +74,13 @@ export default function IndianMarkets() {
       </motion.div>
 
       <motion.div variants={itemVariants}>
-        <LiveChart symbol={symbol} height={560} allowSymbolChange onSymbolChange={setSymbol} />
+        <LiveChart symbol={symbol} height={560} allowSymbolChange onSymbolChange={handleSelectSymbol} />
       </motion.div>
 
       <motion.div variants={itemVariants} className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <QuotesBoard title="Indices" symbols={INDICES} selected={symbol} onSelect={setSymbol} />
+        <QuotesBoard title="Indices" symbols={INDICES} selected={symbol} onSelect={handleSelectSymbol} />
         <div className="xl:col-span-2">
-          <QuotesBoard title="Top Stocks (NSE)" symbols={STOCKS} selected={symbol} onSelect={setSymbol} />
+          <QuotesBoard title="Top Stocks (NSE)" symbols={STOCKS} selected={symbol} onSelect={handleSelectSymbol} />
         </div>
       </motion.div>
     </motion.div>

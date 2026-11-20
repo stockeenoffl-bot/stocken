@@ -48,7 +48,7 @@ export default function QuotesBoard({ title, symbols, onSelect, selected }: Prop
                     {q ? `${up ? '+' : ''}${fmtPrice(q.change)}` : ''}
                   </td>
                   <td className={`px-3 py-2 text-right font-mono ${up ? 'text-emerald-400' : 'text-rose-400'}`}>
-                    {q ? (
+                    {q && q.changePercent != null ? (
                       <span className="inline-flex items-center gap-0.5">
                         {up ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
                         {up ? '+' : ''}{q.changePercent.toFixed(2)}%

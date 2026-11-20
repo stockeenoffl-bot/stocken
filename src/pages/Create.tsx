@@ -22,6 +22,7 @@ import type { ChartDrawing } from '@/types/chart'
 import type { RangeKey, Timeframe } from '@/lib/candles'
 import { useAnalysis } from '@/contexts/AnalysisContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useMarket } from '@/contexts/MarketContext'
 import { analysisService } from '@/services/analysisService'
 import { broadcastSyncService } from '@/services/broadcastSyncService'
 import { toast } from 'sonner'
@@ -39,15 +40,26 @@ const item = {
 export default function Create() {
   const { analysis, setAnalysis } = useAnalysis()
   const { profile } = useAuth()
+  const { market: globalMarket, setMarket: setGlobalMarket } = useMarket()
 
   // Primary market selection matching Screenshot 2: NIFTY 50 vs SENSEX
-  const [selectedMarket, setSelectedMarket] = useState<'NIFTY 50' | 'SENSEX'>('NIFTY 50')
+  const [selectedMarket, setSelectedMarket] = useState<'NIFTY 50' | 'SENSEX'>(
+    globalMarket === 'SENSEX' ? 'SENSEX' : 'NIFTY 50'
+  )
   const [analysisDate, setAnalysisDate] = useState('29 Apr 2025')
   const [isSaving, setIsSaving] = useState(false)
   const [showAdditionalZone, setShowAdditionalZone] = useState(false)
   const [customDrawings, setCustomDrawings] = useState<ChartDrawing[]>([])
   const [chartView, setChartView] = useState<{ timeframe: Timeframe; range: RangeKey }>({ timeframe: '15m', range: '1W' })
   const [hydratedFor, setHydratedFor] = useState<string | null>(null)
+
+  // Sync with global market toggle in TopHeader
+  useEffect(() => {
+    if (globalMarket && (globalMarket === 'NIFTY 50' || globalMarket === 'SENSEX') && globalMarket !== selectedMarket) {
+      setSelectedMarket(globalMarket)
+      setHydratedFor(null)
+    }
+  }, [globalMarket])
 
   // Last publication tracking
   const [lastPublishedInfo, setLastPublishedInfo] = useState<{
@@ -155,6 +167,7 @@ export default function Create() {
 
   const handleMarketChange = (market: 'NIFTY 50' | 'SENSEX') => {
     setSelectedMarket(market)
+    setGlobalMarket(market)
     setHydratedFor(null)
   }
 
@@ -952,155 +965,34 @@ export default function Create() {
         </motion.div>
       </div>
 
-      {/* STEPS 5 & 6: 2-Column Grid matching Screenshot 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* STEP 5: Session Expectations */}
-        <motion.div
-          variants={item}
-          className="rounded-xl border border-[#1A2234] bg-[#0D121F] p-4 shadow-sm space-y-4"
-        >
+      {/* STEP 5: Notes / Explanation */}
+      <motion.div
+        variants={item}
+        className="rounded-xl border border-[#1A2234] bg-[#0D121F] p-4 shadow-sm space-y-3"
+      >
+        <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
               5
             </div>
-            <div className="flex items-center gap-1.5">
-              <h3 className="text-sm font-bold text-white tracking-wide">
-                Session Expectations
-              </h3>
-              <span className="text-xs text-slate-500">(Optional)</span>
-              <HelpCircle size={13} className="text-slate-500 cursor-help" />
-            </div>
+            <h3 className="text-sm font-bold text-white tracking-wide">
+              Notes / Explanation
+            </h3>
           </div>
+          <span className="text-[11px] font-mono text-slate-500">
+            {analysis.notes.length}/300
+          </span>
+        </div>
 
-          {/* Asian Session */}
-          <div className="flex items-center justify-between py-1.5 border-b border-[#1A2234]">
-            <span className="text-xs font-semibold text-slate-300">Asian Session</span>
-            <div className="flex items-center gap-1.5">
-              {(['Bullish', 'Bearish', 'Neutral'] as const).map((choice) => {
-                const isActive = analysis.sessions.asian === choice
-                return (
-                  <button
-                    key={choice}
-                    type="button"
-                    onClick={() =>
-                      setAnalysis({
-                        ...analysis,
-                        sessions: { ...analysis.sessions, asian: choice },
-                      })
-                    }
-                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all border ${
-                      isActive
-                        ? choice === 'Neutral'
-                          ? 'bg-amber-500/20 text-amber-300 border-amber-500'
-                          : choice === 'Bullish'
-                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500'
-                          : 'bg-rose-500/20 text-rose-300 border-rose-500'
-                        : 'border-[#1E293B] bg-[#141B2D] text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {choice}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* London Session */}
-          <div className="flex items-center justify-between py-1.5 border-b border-[#1A2234]">
-            <span className="text-xs font-semibold text-slate-300">London Session</span>
-            <div className="flex items-center gap-1.5">
-              {(['Bullish', 'Bearish', 'Neutral'] as const).map((choice) => {
-                const isActive = analysis.sessions.london === choice
-                return (
-                  <button
-                    key={choice}
-                    type="button"
-                    onClick={() =>
-                      setAnalysis({
-                        ...analysis,
-                        sessions: { ...analysis.sessions, london: choice },
-                      })
-                    }
-                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all border ${
-                      isActive
-                        ? choice === 'Bullish'
-                          ? 'bg-emerald-600 text-white border-emerald-500 shadow-sm'
-                          : choice === 'Bearish'
-                          ? 'bg-rose-600 text-white border-rose-500'
-                          : 'bg-amber-600 text-white border-amber-500'
-                        : 'border-[#1E293B] bg-[#141B2D] text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {choice}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* New York Session */}
-          <div className="flex items-center justify-between py-1.5">
-            <span className="text-xs font-semibold text-slate-300">New York Session</span>
-            <div className="flex items-center gap-1.5">
-              {(['Bullish', 'Bearish', 'Volatile'] as const).map((choice) => {
-                const isActive = analysis.sessions.newYork === choice
-                return (
-                  <button
-                    key={choice}
-                    type="button"
-                    onClick={() =>
-                      setAnalysis({
-                        ...analysis,
-                        sessions: { ...analysis.sessions, newYork: choice },
-                      })
-                    }
-                    className={`px-3 py-1 rounded-md text-[11px] font-bold transition-all border ${
-                      isActive
-                        ? choice === 'Volatile'
-                          ? 'bg-blue-600 text-white border-blue-500 shadow-sm'
-                          : choice === 'Bullish'
-                          ? 'bg-emerald-600 text-white border-emerald-500'
-                          : 'bg-rose-600 text-white border-rose-500'
-                        : 'border-[#1E293B] bg-[#141B2D] text-slate-400 hover:text-white'
-                    }`}
-                  >
-                    {choice}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* STEP 6: Notes / Explanation */}
-        <motion.div
-          variants={item}
-          className="rounded-xl border border-[#1A2234] bg-[#0D121F] p-4 shadow-sm space-y-3"
-        >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-6 h-6 rounded-full bg-indigo-600 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-                6
-              </div>
-              <h3 className="text-sm font-bold text-white tracking-wide">
-                Notes / Explanation
-              </h3>
-            </div>
-            <span className="text-[11px] font-mono text-slate-500">
-              {analysis.notes.length}/300
-            </span>
-          </div>
-
-          <textarea
-            rows={5}
-            maxLength={300}
-            value={analysis.notes}
-            onChange={(e) => setAnalysis({ ...analysis, notes: e.target.value })}
-            className="w-full px-3 py-2.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-xs text-slate-200 leading-relaxed outline-none focus:border-indigo-500 transition-colors resize-none"
-            placeholder="Liquidity sweep below previous swing low followed by strong rejection..."
-          />
-        </motion.div>
-      </div>
+        <textarea
+          rows={4}
+          maxLength={300}
+          value={analysis.notes}
+          onChange={(e) => setAnalysis({ ...analysis, notes: e.target.value })}
+          className="w-full px-3 py-2.5 rounded-lg border border-[#1E293B] bg-[#141B2D] text-xs text-slate-200 leading-relaxed outline-none focus:border-indigo-500 transition-colors resize-none"
+          placeholder="Liquidity sweep below previous swing low followed by strong rejection..."
+        />
+      </motion.div>
 
       {/* ACTION BAR: Save as Draft, Clear All, Preview & Publish (Screenshot 2 Exact Style) */}
       <motion.div
